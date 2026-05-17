@@ -10,29 +10,23 @@
 
 ---
 
-## 💡 核心理念
+## ✨ 为什么选 Murmur
 
-**只为我说过的每一句话付钱。**
-
-没有月费，没有订阅。Murmur 用你自己的 API key 直接连 [Soniox](https://soniox.com)，**典型成本是每小时语音约 $0.05**。不说话不花钱。
-
-AI 润色（可选）直接调用本机已登录的 `claude` 或 `codex` CLI —— 你本来给这两个工具付的费用就是全部，**Murmur 不在中间再加一份**。
-
-整个产品的定位就这一句：在你已经选择的服务上加一层很薄的原生外壳，按用量计费。
+1. **没有月费。** 别人动辄每月 $10–20，Murmur 完全按需付费 —— 你用自己的 Soniox key，按说话时间计费（典型约 $0.05/小时）。
+2. **开源 + 零数据存储。** MIT 协议，不存储任何用户信息，也不经过任何中间服务器，绝对安全。
+3. **AI 润色不产生任何额外费用。** 直接调用本机已登录的 `claude` 或 `codex` CLI，复用你已有的订阅，Murmur 不在中间再加钱。
+4. **支持暂停录音。** 录音中按空格暂停，再按空格继续；可以暂停多次，socket 超时也会自动 reconnect。
+5. **实时语音识别。** 说话的同时，悬浮窗里实时显示识别结果。
 
 ---
 
-## 🌟 你能拿到什么
+## 🎯 核心特性
 
-- ⚡ **实时流式转写**（Soniox WebSocket）—— 首字延迟约 500 ms
-- ✨ **AI 润色不另收费** —— 按 Alt 让本机 `claude` / `codex` CLI 去除赘词修语病；润色 prompt 可在设置页完全自定义
-- ⏸️ **暂停 / 继续** —— 录音中按空格暂停，socket 即便超时断开，再按空格会自动 reconnect，**已识别的文字不会丢**，新文字接在后面
-- 🪶 **极致轻量 + 快** —— 单个 200 KB 的 binary，零 Swift 依赖，13 个源文件，半小时能读完
-- 🌐 **18 种识别语言** —— 多选 checkbox，默认中 + 英
-- 🎯 **焦点恢复** —— 录音中切到别的窗口也没关系，按 Right ⌘ 文字仍然粘到**原本**那个输入框
-- 🌓 **主题自适应** —— 悬浮窗 + 菜单栏图标会跟随系统深/浅模式（NSVisualEffectView + template image）
-
-> 想加入其他 STT API 或 LLM 后端？`SonioxClient.swift` 和 `Polisher.swift` 是有意写得很薄的 adapter —— **欢迎提 issue 或者直接 PR**。
+1. **实时语音识别**（Soniox WebSocket，约 500ms 首字延迟）
+2. **AI 润色** —— 按 Alt 触发本机 `claude` / `codex` CLI 去除赘词，prompt 可自定义
+3. **多语言识别** —— 设置页可多选 18 种语言
+4. **声纹开关** —— 开启后以第一位说话者的声纹为锁定基准，其他人的声音不会被录入，有效避免旁人干扰
+5. **断点续录** —— 随时暂停、随时继续，多次暂停也支持，已识别文字不丢
 
 ---
 
@@ -47,22 +41,59 @@ AI 润色（可选）直接调用本机已登录的 `claude` 或 `codex` CLI —
 
 ---
 
-## 📦 构建
+## ⚡ 快速安装
+
+**前置依赖**
+
+- macOS 13+，Apple Silicon
+- Xcode CommandLine Tools（`xcode-select --install`）
+- [Soniox](https://soniox.com) 账号 + API key（小额免费额度，之后按用量付费）
+- *可选* —— [`claude`](https://claude.com/claude-code) 或 `codex` CLI 已安装并登录（仅润色功能需要；基础录音不需要）
+
+**1 · 构建**
 
 ```bash
-git clone <your-fork-url>
+git clone https://github.com/xwEric/murmur
 cd murmur
-./build.sh         # swiftc + ad-hoc codesign + bundle
+./build.sh                  # swiftc + ad-hoc codesign + bundle（约 3 秒）
 open build/Murmur.app
 ```
 
-要求：macOS 13+，Xcode CommandLine Tools (`xcode-select --install`)。无任何外部 Swift 依赖。
+**2 · 首次运行设置**（一次性）
+
+启动后菜单栏会出现 🍌 小香蕉。第一次运行时：
+
+1. **麦克风权限** —— 系统弹窗，点 **允许**
+2. **辅助功能权限** —— 菜单栏 🍌 → *"打开辅助功能设置"* → 把 `Murmur.app` 加入列表并打开开关
+3. **退出并重新启动 Murmur**（macOS 会重新校验签名，权限需要重启才生效）
+4. 打开设置（菜单栏 🍌 → *"设置…"*）粘贴你的 Soniox API key
+
+**3 · 开始使用**
+
+把光标放进系统中任意输入框（备忘录、Slack、浏览器、终端 —— 哪里都行），然后：
+
+- 按 **Right ⌘** → 说话 → 再按 **Right ⌘** → 文字粘到光标位置
+- 按 **Right ⌘** → 说话 → 按 **Alt** → AI 润色 → 按 **Right ⌘** 插入润色版
+- 录音中按 **Space** 暂停；再按 **Space** 继续
+- 任意状态按 **Esc** 取消，不插入任何内容
+
+**注意事项**
+
+- 如果你重新编译过源码，ad-hoc 签名的 binary hash 会变，**macOS 会撤销权限** —— 需要重新到辅助功能里把 Murmur 加上、麦克风再授权一次。停止改代码后就不再有这个问题。
+- 第一次录音的 WebSocket 启动会多几百毫秒，之后都是即时的。
+- AI 润色需要 `claude` 或 `codex` CLI 提前登录好，Murmur 自己不管 CLI 的登录流程。
+
+---
+
+## 💡 核心理念
+
+**只为我说过的每一句话付钱。** 没有月费，音频从你的电脑直接送到 Soniox（用你自己的 key），AI 润色经过你已登录的本机 CLI —— Murmur 只是把这些服务串起来的最薄一层。
 
 ---
 
 ## ⚙️ 配置
 
-App 第一次启动会自动弹出设置页。配置文件位于 `~/.claude-profile/dictate/config.json`：
+配置文件位于 `~/.claude-profile/dictate/config.json`：
 
 ```json
 {
@@ -85,18 +116,6 @@ App 第一次启动会自动弹出设置页。配置文件位于 `~/.claude-prof
 | `polish_model` | `sonnet` | claude: `sonnet`/`haiku`/`opus`；codex: `gpt-5-codex` 等 |
 | `polish_prompt` | `""` | 空字符串 = 使用内置 prompt；非空 = 你自定义的 prompt |
 | `speaker_lock` | `false` | 实验功能 — 锁定第一个识别到的说话人，过滤其他人 |
-
-**润色后端依赖**：`claude` CLI（[Claude Code](https://claude.com/claude-code)）或 `codex` CLI，需登录。
-
----
-
-## 🚀 首次运行
-
-1. 启动 Murmur.app
-2. **麦克风**权限弹窗 → 允许
-3. **辅助功能**：菜单 → "打开辅助功能设置" → 把 Murmur 加入并打开开关
-4. 退出并重新打开 Murmur（让 macOS 重新校验 CDHash）
-5. 打开任意文本输入框，按右⌘ 开始说话
 
 ---
 
@@ -135,9 +154,8 @@ App 第一次启动会自动弹出设置页。配置文件位于 `~/.claude-prof
 - **`swiftc` 直接编译**而非 Xcode 工程 — 单文件无依赖，CI 友好
 - **临时剪贴板粘贴**而非逐字符模拟键盘 — 速度快、中文/Emoji 兼容、350 ms 后自动恢复原剪贴板
 - **`CGEventTap` 监听全局 hotkey** — 唯一能区分左/右 Command 的 API（用 device-dependent flag bit `0x10`）
-- **润色 prompt 走 `--system-prompt`**，CLI 配合 `--output-format text` 拿纯净结果
 - **Esc 选择性消费** — phase ≠ idle 时拦截，其他时候透传，不破坏其他 app 的快捷键
-- **NSVisualEffectView 用 9-slice `maskImage`** — 让圆角和窗口阴影完美对齐，不再露出矩形外框
+- **NSVisualEffectView 用 9-slice `maskImage`** — 圆角和窗口阴影完美对齐，不露出矩形外框
 
 ---
 
@@ -145,9 +163,9 @@ App 第一次启动会自动弹出设置页。配置文件位于 `~/.claude-prof
 
 Murmur 故意写得很小。最适合扩展的几个点：
 
-- **`SonioxClient.swift`** — 把 Soniox 换成其他实时 STT（AssemblyAI、Deepgram、OpenAI Realtime 等等）。结构很简单：发配置 → 流 PCM → 拿 token。
-- **`Polisher.swift`** — 加新 LLM 后端。现在有 `claude`（Anthropic）和 `codex`（OpenAI）两个，加个 `gemini` 或本地 `ollama` 大概 30 行代码。
-- **`Strings.swift`** — 加更多 UI 语言。
+- **`SonioxClient.swift`** — 把 Soniox 换成其他实时 STT（AssemblyAI、Deepgram、OpenAI Realtime 等）
+- **`Polisher.swift`** — 加新 LLM 后端。现在有 `claude`（Anthropic）和 `codex`（OpenAI）两个，加 Gemini 或本地 Ollama 大概 30 行代码
+- **`Strings.swift`** — 加更多 UI 语言
 
 大改动先开 issue，小改直接 PR。
 
@@ -155,10 +173,9 @@ Murmur 故意写得很小。最适合扩展的几个点：
 
 ## ❓ 已知限制
 
-- ad-hoc codesign 每次 rebuild CDHash 都变，TCC 权限会被撤销 — 开发中很烦，发布前用稳定签名身份解决
+- ad-hoc codesign 每次 rebuild CDHash 都变，TCC 权限会被撤销 — 开发中正常，发布前用稳定签名身份解决
 - Soniox 实时 API 需要付费账号（有免费额度）
 - 仅支持 Apple Silicon（如需 Intel，改 `build.sh` 加 `-target x86_64-apple-macos13.0`）
-- 单人录音场景；多人同时说话依赖 Soniox 服务端 diarization 准确度（设置页可开启实验）
 
 ---
 

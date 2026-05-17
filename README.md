@@ -10,29 +10,23 @@
 
 ---
 
-## 💡 The core idea
+## ✨ Why Murmur
 
-**Pay only for the words you actually speak.**
-
-No monthly subscription. Murmur talks to [Soniox](https://soniox.com) directly with your own API key — typical cost is around **$0.05/hour of speech**. If you don't dictate, you don't pay.
-
-AI polish (optional) is done by spawning your local `claude` or `codex` CLI. Whatever you're already paying those for, that's it — Murmur adds nothing on top.
-
-That's the whole pitch: a thin native layer over services you choose, billed by use.
+1. **No subscription.** Others charge $10–20/month flat. Murmur is pay-as-you-go to Soniox with your own key (typically ~$0.05/hour of speech).
+2. **Open source, zero data retention.** MIT-licensed; nothing about you is stored or proxied through anyone else's servers.
+3. **AI polish at no extra cost.** Calls your locally-installed `claude` / `codex` CLI — uses whatever subscription you already have for those, Murmur adds nothing.
+4. **Pause as many times as you want.** Press Space to pause mid-recording, press again to resume. Works repeatedly, auto-reconnects on socket timeout.
+5. **Real-time transcription.** Words show up in the overlay as you speak.
 
 ---
 
-## 🌟 What you actually get
+## 🎯 Core features
 
-- ⚡ **Real-time streaming transcription** via Soniox WebSocket — first words appear within ~500 ms
-- ✨ **Optional AI polish at no extra cost** — your local `claude` / `codex` CLI cleans up filler words and stutters when you press Alt; the polish prompt is fully customizable in Settings
-- ⏸️ **Pause & resume** — press Space mid-recording; if the WebSocket times out while you're paused, Murmur auto-reconnects and the new transcript is appended to what you already have, **nothing is lost**
-- 🪶 **Lightweight & fast** — single 200 KB binary, zero Swift dependencies, twelve source files. Reads in 30 minutes.
-- 🌐 **18 recognition languages** — multi-select; default zh + en
-- 🎯 **Focus restoration** — switch windows mid-recording; pressing Right ⌘ still pastes into the *original* text field
-- 🌓 **Auto-themed** — overlay and menu bar icon adapt to system light/dark mode (NSVisualEffectView + template image)
-
-> Want another STT API or LLM backend? `SonioxClient.swift` and `Polisher.swift` are intentionally short adapters — **open an issue or send a PR**, contributions welcome.
+1. **Real-time speech recognition** (Soniox WebSocket, ~500 ms first-token latency)
+2. **AI polish** — press Alt to clean up filler words via local `claude` / `codex` CLI; custom prompts supported
+3. **Multi-language recognition** — 18 languages selectable in Settings
+4. **Speaker lock** — when enabled, locks onto the first speaker; other voices in the background are dropped
+5. **Pause & resume** — pause anytime, resume anytime; previously transcribed text is preserved across socket reconnects
 
 ---
 
@@ -42,27 +36,64 @@ That's the whole pitch: a thin native layer over services you choose, billed by 
 |---|---|
 | **Right ⌘** | Start recording → stop & paste → commit text in review state |
 | **Alt** | During recording → stop & polish; in review → toggle original ↔ polished |
-| **Space** | Recording → pause; paused → resume (auto-reconnects on socket timeout) |
+| **Space** | Recording → pause; paused → resume |
 | **Esc** | Cancel anywhere — discard without inserting |
 
 ---
 
-## 📦 Build
+## ⚡ Quick install
+
+**Prerequisites**
+
+- macOS 13+ on Apple Silicon
+- Xcode CommandLine Tools (`xcode-select --install`)
+- A [Soniox](https://soniox.com) account + API key (small free tier; very cheap pay-as-you-go after)
+- *Optional* — [`claude`](https://claude.com/claude-code) or `codex` CLI installed and logged in (only needed for AI polish; basic dictation works without it)
+
+**1 · Build**
 
 ```bash
-git clone <your-fork-url>
+git clone https://github.com/xwEric/murmur
 cd murmur
-./build.sh         # swiftc + ad-hoc codesign + bundle
+./build.sh                  # swiftc + ad-hoc codesign + bundle (~3 seconds)
 open build/Murmur.app
 ```
 
-Requirements: macOS 13+, Xcode CommandLine Tools (`xcode-select --install`). No external Swift dependencies.
+**2 · First-run setup** (one-time)
+
+A small 🍌 banana icon appears in your menu bar. On first launch:
+
+1. **Microphone permission** — a system dialog pops up; click **Allow**
+2. **Accessibility permission** — menu bar 🍌 → *"Open Accessibility Settings"* → add `Murmur.app` and toggle the switch on
+3. **Quit and relaunch Murmur** (macOS re-validates the signature; permissions only apply after a fresh launch)
+4. Open Settings (menu bar 🍌 → *"Settings…"*) and paste your Soniox API key
+
+**3 · Use it**
+
+Click any text field anywhere on your system (Notes, Slack, browser, terminal — anywhere), then:
+
+- Press **Right ⌘** → speak → press **Right ⌘** again → text appears at cursor
+- Press **Right ⌘** → speak → press **Alt** → AI polishes → press **Right ⌘** to insert polished
+- Press **Space** mid-recording to pause; press **Space** again to resume
+- Press **Esc** anytime to cancel without inserting
+
+**Heads-up**
+
+- If you rebuild from source, ad-hoc codesign changes the binary hash and **macOS will revoke permissions** — you'll need to re-add Murmur to Accessibility & re-grant Microphone after each rebuild. Not a problem once you stop touching the code.
+- The very first recording may take an extra ~500 ms to spin up the WebSocket; subsequent ones are instant.
+- AI polish requires your `claude` or `codex` CLI to already be logged in — Murmur doesn't handle that login flow.
+
+---
+
+## 💡 The core idea
+
+**Pay only for the words you actually speak.** No monthly subscription. Audio goes straight from your machine to Soniox using your key. AI polish runs through your already-logged-in CLI — Murmur stitches these together with the thinnest possible native layer.
 
 ---
 
 ## ⚙️ Configuration
 
-Settings opens automatically on first launch. The config lives at `~/.claude-profile/dictate/config.json`:
+Config file at `~/.claude-profile/dictate/config.json`:
 
 ```json
 {
@@ -85,18 +116,6 @@ Settings opens automatically on first launch. The config lives at `~/.claude-pro
 | `polish_model` | `sonnet` | claude: `sonnet`/`haiku`/`opus`; codex: `gpt-5-codex` etc. |
 | `polish_prompt` | `""` | Empty = built-in default; non-empty = your custom prompt |
 | `speaker_lock` | `false` | Experimental — locks to first-detected speaker via Soniox diarization |
-
-**Polish prerequisites**: either `claude` ([Claude Code](https://claude.com/claude-code)) or `codex` CLI installed and logged in.
-
----
-
-## 🚀 First run
-
-1. Launch Murmur.app
-2. Approve the **Microphone** prompt
-3. **Accessibility**: menu → "Open Accessibility Settings" → add Murmur and toggle on
-4. Quit and relaunch (so macOS re-validates the CDHash)
-5. Click any text field, press Right ⌘, speak
 
 ---
 
@@ -135,7 +154,6 @@ Settings opens automatically on first launch. The config lives at `~/.claude-pro
 - **`swiftc` direct compile** instead of an Xcode project — single-source, no dependencies, CI-friendly
 - **Clipboard paste** instead of synthesized typing — fast, CJK/emoji-safe, restores the original clipboard after 350 ms
 - **`CGEventTap` for global hotkeys** — only API that can distinguish left vs right Command (via device-dependent flag bit `0x10`)
-- **Polish via `--system-prompt`** + `--output-format text` for clean output
 - **Selective Esc consumption** — intercepted only while the overlay is up, passes through otherwise
 - **9-slice `maskImage` on NSVisualEffectView** so rounded corners + window shadow stay aligned
 
@@ -145,9 +163,9 @@ Settings opens automatically on first launch. The config lives at `~/.claude-pro
 
 Murmur is intentionally small. The places worth extending:
 
-- **`SonioxClient.swift`** — swap Soniox for another real-time STT (AssemblyAI, Deepgram, OpenAI Realtime, etc.). The shape is straightforward: send config → stream PCM → consume tokens.
-- **`Polisher.swift`** — add a new LLM backend. Right now there are two: `claude` (Anthropic) and `codex` (OpenAI). Adding e.g. `gemini` or a local Ollama would be a ~30-line patch.
-- **`Strings.swift`** — add more language UIs.
+- **`SonioxClient.swift`** — swap Soniox for another real-time STT (AssemblyAI, Deepgram, OpenAI Realtime, etc.)
+- **`Polisher.swift`** — add a new LLM backend. Right now there are two: `claude` (Anthropic) and `codex` (OpenAI). Adding Gemini or local Ollama would be a ~30-line patch.
+- **`Strings.swift`** — add more UI languages
 
 Open an issue first if it's a bigger change, otherwise send a PR.
 
@@ -155,10 +173,9 @@ Open an issue first if it's a bigger change, otherwise send a PR.
 
 ## ❓ Known limitations
 
-- Ad-hoc codesign changes the CDHash on every rebuild, which revokes TCC permissions — annoying during development; use a stable signing identity for release
+- Ad-hoc codesign changes the CDHash on every rebuild, which revokes TCC permissions — fine during development, use a stable signing identity for release
 - Soniox real-time API requires a paid account (small free tier available)
 - Apple Silicon only (add `-target x86_64-apple-macos13.0` in `build.sh` for Intel)
-- Single-speaker use case by default; multi-speaker filtering relies on Soniox server-side diarization (toggle in Settings — accuracy varies)
 
 ---
 
