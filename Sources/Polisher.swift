@@ -191,6 +191,13 @@ enum Polisher {
         // auto-discovery. Pinning cwd to /tmp keeps file system probes harmless.
         proc.currentDirectoryURL = URL(fileURLWithPath: "/tmp")
 
+        // CRITICAL: redirect stdin to /dev/null. claude -p still waits 3 seconds for stdin
+        // data when stdin is a TTY/pipe, even when the prompt is passed as an argument.
+        // This single change cuts polish latency by ~3 seconds.
+        if let devNull = FileHandle(forReadingAtPath: "/dev/null") {
+            proc.standardInput = devNull
+        }
+
         let outPipe = Pipe()
         let errPipe = Pipe()
         proc.standardOutput = outPipe
