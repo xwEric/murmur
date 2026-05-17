@@ -423,7 +423,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem(title: Strings.menuTestRecording, action: #selector(testToggle), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: Strings.menuRecheckPerms, action: #selector(recheckPermissions), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
-        menu.addItem(NSMenuItem(title: Strings.menuOpenConfig, action: #selector(openConfigFolder), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: Strings.menuOpenAccess, action: #selector(openAccessibility), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: Strings.menuQuit, action: #selector(quit), keyEquivalent: "q"))
@@ -438,18 +437,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func testToggle() { onRightCmd() }
     @objc private func recheckPermissions() { attemptHotkeyStart(promptIfMissing: true) }
 
-    /// Loads the menu bar icon. Prefers a black template PNG (Apple-standard); falls back to 🍌 emoji.
+    /// Loads the menu bar icon from the bundled PNG. The logo has its own white
+    /// background, so isTemplate is false (we don't want the system to recolor it).
     private func updateMenuBarIcon() {
         guard let button = statusItem.button else { return }
-        let menuBarIconPath = Bundle.main.resourcePath.flatMap { "\($0)/menubar_banana.png" }
-        if let path = menuBarIconPath, FileManager.default.fileExists(atPath: path),
-           let img = NSImage(contentsOfFile: path) {
-            img.isTemplate = true
+        let path = Bundle.main.resourcePath.flatMap { "\($0)/menubar_banana.png" }
+        if let p = path, FileManager.default.fileExists(atPath: p),
+           let img = NSImage(contentsOfFile: p) {
+            img.isTemplate = false
             img.size = NSSize(width: 18, height: 18)
             button.image = img
             button.title = ""
         } else {
-            button.title = "🍌"
+            button.title = "⬡"
             button.image = nil
         }
     }
@@ -462,13 +462,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         settingsWindow?.show()
-    }
-
-    @objc private func openConfigFolder() {
-        let url = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".claude-profile/dictate", isDirectory: true)
-        try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
-        NSWorkspace.shared.open(url)
     }
 
     @objc private func openAccessibility() {

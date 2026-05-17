@@ -43,7 +43,6 @@ enum Strings {
     static var menuTagline: String { L("右⌘ 录音  ·  Alt 润色  ·  Esc 取消", "Right ⌘ record  ·  Alt polish  ·  Esc cancel") }
     static var menuTestRecording: String { L("测试录音 (debug)", "Test Recording (debug)") }
     static var menuRecheckPerms: String { L("重新检测权限", "Re-check Permissions") }
-    static var menuOpenConfig: String { L("打开配置目录", "Open Config Folder") }
     static var menuOpenAccess: String { L("打开辅助功能设置", "Open Accessibility Settings") }
     static var menuSettings: String { L("设置…", "Settings…") }
     static var menuQuit: String { L("退出 Murmur", "Quit Murmur") }
@@ -69,27 +68,51 @@ enum Strings {
     static var providerOpenAI:   String { L("OpenAI Realtime",          "OpenAI Realtime") }
     static var providerCustom:   String { L("自定义 (OpenAI 兼容)",     "Custom (OpenAI-compatible)") }
 
+    // Per-provider clickable signup links
+    static var settingsLinkSoniox: String   { L("→ 注册 Soniox 并获取 API key", "→ Sign up at Soniox and get an API key") }
+    static var settingsLinkDeepgram: String { L("→ 注册 Deepgram 并获取 API key（送 $200 额度）", "→ Sign up at Deepgram and get an API key ($200 free credit)") }
+    static var settingsLinkOpenAI: String   { L("→ 在 OpenAI Platform 创建 API key", "→ Create an API key on OpenAI Platform") }
+
     // Soniox
     static var settingsSonioxKey: String { L("Soniox API Key", "Soniox API Key") }
-    static var settingsSonioxKeyHelp: String { L("从 console.soniox.com 获取。", "Get yours at console.soniox.com.") }
+    static var settingsSonioxKeyHelp: String { L(
+        "申请步骤：\n1. 注册 console.soniox.com（Google 登录可用）\n2. Settings → API Keys → Create new key\n3. 多语言识别质量最好；注册有免费额度，之后约 $0.04/分钟",
+        "How to get it:\n1. Sign up at console.soniox.com (Google login works)\n2. Settings → API Keys → Create new key\n3. Best multilingual quality; free trial included, ~$0.04/min after"
+    ) }
     static var settingsSonioxModel: String { L("Soniox 模型", "Soniox Model") }
 
     // Deepgram
     static var settingsDeepgramKey: String { L("Deepgram API Key", "Deepgram API Key") }
-    static var settingsDeepgramKeyHelp: String { L("console.deepgram.com → API Keys", "console.deepgram.com → API Keys") }
+    static var settingsDeepgramKeyHelp: String { L(
+        "申请步骤：\n1. 注册 console.deepgram.com（新账号送 $200 额度，约 750 小时音频）\n2. 进入控制台 → API Keys → Create a New API Key\n3. 角色选 \"Member\" 即可；适合英文为主、对延迟敏感的场景",
+        "How to get it:\n1. Sign up at console.deepgram.com (new accounts get $200 free credit ≈ 750 hours)\n2. Console → API Keys → Create a New API Key\n3. Role: \"Member\" is enough; best for English-heavy or latency-sensitive use"
+    ) }
     static var settingsDeepgramModel: String { L("Deepgram 模型", "Deepgram Model") }
 
     // OpenAI
     static var settingsOpenAIKey: String { L("OpenAI API Key", "OpenAI API Key") }
-    static var settingsOpenAIKeyHelp: String { L("platform.openai.com/api-keys", "platform.openai.com/api-keys") }
+    static var settingsOpenAIKeyHelp: String { L(
+        "申请步骤：\n1. 去 platform.openai.com/api-keys 创建 key（需要付费账户）\n2. 确保账户开通了 Realtime API 访问（多数付费账户默认有）\n3. 默认 gpt-4o-mini-transcribe；可选 gpt-4o-transcribe 质量更高但更贵",
+        "How to get it:\n1. Create a key at platform.openai.com/api-keys (paid account required)\n2. Make sure your account has Realtime API access (most paid accounts do)\n3. Default model: gpt-4o-mini-transcribe; gpt-4o-transcribe is higher quality but pricier"
+    ) }
     static var settingsOpenAIModel: String { L("OpenAI 模型", "OpenAI Model") }
 
     // Custom
     static var settingsCustomBaseUrl: String { L("Base URL (wss://…)", "Base URL (wss://…)") }
-    static var settingsCustomBaseUrlHelp: String { L("任何 OpenAI Realtime 兼容端点（Azure / vLLM / 私有部署等）。", "Any OpenAI-Realtime-compatible endpoint (Azure / vLLM / self-hosted).") }
+    static var settingsCustomBaseUrlHelp: String { L(
+        "适用于任何 OpenAI Realtime 兼容服务：Azure OpenAI、自建 vLLM、私有部署等。\nURL 格式：wss://your-host/v1/realtime?intent=transcription\n协议遵循 OpenAI 官方文档（transcription_session.update + input_audio_buffer.append）",
+        "For any OpenAI-Realtime-compatible service: Azure OpenAI, self-hosted vLLM, private deployments, etc.\nURL format: wss://your-host/v1/realtime?intent=transcription\nProtocol follows OpenAI spec (transcription_session.update + input_audio_buffer.append)"
+    ) }
     static var settingsCustomKey: String { L("API Key", "API Key") }
+    static var settingsCustomKeyHelp: String { L(
+        "服务商在 Authorization: Bearer header 中期望的值。",
+        "Whatever your endpoint expects in the Authorization: Bearer header."
+    ) }
     static var settingsCustomModel: String { L("模型名称", "Model name") }
-    static var settingsCustomModelHelp: String { L("将在 transcription_session.update 中发送。", "Sent in transcription_session.update.") }
+    static var settingsCustomModelHelp: String { L(
+        "将在 transcription_session.update 的 model 字段中发送。",
+        "Sent as the model field in transcription_session.update."
+    ) }
 
     // Other
     static var settingsLangHints: String { L("识别语言", "Language hints") }

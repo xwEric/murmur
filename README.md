@@ -97,7 +97,7 @@ open build/Murmur.app
 
 **2 · First-run setup** (one-time)
 
-A small hexagon icon appears in your menu bar. On first launch:
+A small hexagonal icon appears in your menu bar. On first launch:
 
 1. **Microphone permission** — a system dialog pops up; click **Allow**
 2. **Accessibility permission** — menu bar icon → *"Open Accessibility Settings"* → add `Murmur.app` and toggle the switch on
@@ -124,113 +124,6 @@ Click any text field anywhere on your system (Notes, Slack, browser, terminal �
 ## 💡 The core idea
 
 **Pay only for the words you actually speak.** No monthly subscription. Audio goes straight from your machine to the STT provider you choose, using your key. AI polish runs through your already-logged-in CLI — Murmur stitches these together with the thinnest possible native layer.
-
----
-
-## ⚙️ Configuration
-
-Config file at `~/.claude-profile/dictate/config.json`. Most of this is managed by Settings, but you can edit it directly:
-
-```json
-{
-  "stt_provider": "soniox",
-
-  "soniox_api_key": "...",
-  "soniox_model": "stt-rt-preview",
-
-  "deepgram_api_key": "...",
-  "deepgram_model": "nova-3",
-
-  "openai_api_key": "...",
-  "openai_model": "gpt-4o-mini-transcribe",
-
-  "custom_base_url": "",
-  "custom_api_key": "",
-  "custom_model": "",
-
-  "language_hints": ["zh", "en"],
-  "polish_backend": "claude",
-  "polish_model": "sonnet",
-  "polish_prompt": "",
-  "speaker_lock": false
-}
-```
-
-| Field | Notes |
-|---|---|
-| `stt_provider` | `soniox` \| `deepgram` \| `openai` \| `custom` |
-| `*_api_key` / `*_model` | Per-provider auth + model; only the active provider's fields are used |
-| `custom_base_url` | OpenAI-Realtime-compatible WSS endpoint (used when `stt_provider=custom`) |
-| `language_hints` | Languages to expect (improves accuracy); Deepgram switches to multilingual when >1 hint |
-| `polish_backend` | `claude` or `codex` |
-| `polish_prompt` | Empty = built-in default; non-empty = your custom system prompt |
-| `speaker_lock` | Experimental, Soniox only — locks to first-detected speaker |
-
----
-
-## 🧱 Project layout
-
-```
-~/code/dictate/
-├── Sources/                       # 18 Swift files
-│   ├── main.swift                 # @main entry
-│   ├── AppDelegate.swift          # controller + state machine
-│   ├── AppState.swift             # idle / recording / paused / finalizing / polishing / reviewing
-│   ├── HotkeyMonitor.swift        # CGEventTap — Right ⌘ / Alt / Space / Esc
-│   ├── AudioRecorder.swift        # AVAudioEngine → 16 kHz mono PCM16
-│   ├── STTClient.swift            # protocol for streaming STT backends
-│   ├── STTClientFactory.swift     # picks the right client by config
-│   ├── SonioxClient.swift         # Soniox real-time WebSocket
-│   ├── DeepgramClient.swift       # Deepgram Nova-3 WebSocket
-│   ├── OpenAIRealtimeClient.swift # OpenAI Realtime (gpt-4o-mini-transcribe)
-│   ├── CustomSTTClient.swift      # OpenAI-compatible custom endpoint
-│   ├── Polisher.swift             # spawns claude / codex CLI for polish
-│   ├── TextInjector.swift         # clipboard + simulated ⌘V + focus restore
-│   ├── SoundPlayer.swift          # start.mp3 / end.mp3 chimes
-│   ├── LiveTextWindow.swift       # bottom-center overlay (adaptive height/font + scroll)
-│   ├── SettingsWindow.swift       # sidebar Settings (General / Provider / Polish)
-│   ├── PlaceholderTextView.swift  # NSTextView with placeholder
-│   ├── Config.swift               # JSON config I/O
-│   └── Strings.swift              # zh/en i18n
-├── Resources/
-│   ├── Info.plist
-│   ├── Murmur.entitlements
-│   ├── icon_1024.png              # honeycomb app icon
-│   ├── menubar_banana.png         # menu bar template (legacy filename)
-│   └── start.mp3 / end.mp3
-└── build.sh                       # swiftc + codesign + bundle
-```
-
----
-
-## 🛠️ Design choices
-
-- **`swiftc` direct compile** instead of an Xcode project — single-source, no dependencies, CI-friendly
-- **Clipboard paste** instead of synthesized typing — fast, CJK/emoji-safe, restores the original clipboard after 350 ms
-- **`CGEventTap` for global hotkeys** — only API that can distinguish left vs right Command (via device-dependent flag bit `0x10`)
-- **Selective Esc consumption** — intercepted only while the overlay is up, passes through otherwise
-- **9-slice `maskImage` on NSVisualEffectView** so rounded corners + window shadow stay aligned
-- **STT provider behind a `STTClient` protocol** — each backend is a self-contained file; adding a new one is a single file + a factory entry
-
----
-
-## 🤝 Contributing
-
-Murmur is intentionally small. The places worth extending:
-
-- **New STT provider** — implement `STTClient` in a new file, add a case to `STTClientFactory`. Look at `DeepgramClient.swift` for the simplest template.
-- **New polish LLM** — add a backend in `Polisher.swift`. Currently there are two: `claude` (Anthropic) and `codex` (OpenAI). Adding Gemini or local Ollama would be ~30 lines.
-- **More UI languages** — add strings in `Strings.swift`.
-
-Open an issue first if it's a bigger change, otherwise send a PR.
-
----
-
-## ❓ Known limitations
-
-- Ad-hoc codesign changes the CDHash on every rebuild, which revokes TCC permissions — fine during development, use a stable signing identity for release
-- Each STT provider requires its own API key; **you only need one** to use Murmur
-- Apple Silicon only (add `-target x86_64-apple-macos13.0` in `build.sh` for Intel)
 
 ---
 

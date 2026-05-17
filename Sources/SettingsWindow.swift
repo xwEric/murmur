@@ -375,6 +375,9 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, N
         s.spacing = 12
         s.translatesAutoresizingMaskIntoConstraints = false
 
+        s.addArrangedSubview(makeLinkButton(title: Strings.settingsLinkSoniox,
+                                            url: "https://console.soniox.com"))
+
         sonioxKeyField = NSSecureTextField()
         sonioxKeyField.placeholderString = "soniox API key"
         sonioxKeyField.translatesAutoresizingMaskIntoConstraints = false
@@ -398,6 +401,9 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, N
         s.spacing = 12
         s.translatesAutoresizingMaskIntoConstraints = false
 
+        s.addArrangedSubview(makeLinkButton(title: Strings.settingsLinkDeepgram,
+                                            url: "https://console.deepgram.com"))
+
         deepgramKeyField = NSSecureTextField()
         deepgramKeyField.placeholderString = "deepgram API key"
         deepgramKeyField.translatesAutoresizingMaskIntoConstraints = false
@@ -420,6 +426,9 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, N
         s.alignment = .leading
         s.spacing = 12
         s.translatesAutoresizingMaskIntoConstraints = false
+
+        s.addArrangedSubview(makeLinkButton(title: Strings.settingsLinkOpenAI,
+                                            url: "https://platform.openai.com/api-keys"))
 
         openaiKeyField = NSSecureTextField()
         openaiKeyField.placeholderString = "sk-..."
@@ -455,7 +464,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, N
         customKeyField.placeholderString = "API key (sent as Bearer token)"
         customKeyField.translatesAutoresizingMaskIntoConstraints = false
         s.addArrangedSubview(makeFieldRow(label: Strings.settingsCustomKey,
-                                          help: nil,
+                                          help: Strings.settingsCustomKeyHelp,
                                           field: customKeyField))
 
         customModelField = NSTextField()
@@ -466,6 +475,33 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, N
                                           field: customModelField))
 
         return s
+    }
+
+    /// Renders a small underlined hyperlink-style button that opens `url` in the default browser.
+    private func makeLinkButton(title: String, url: String) -> NSView {
+        let btn = NSButton(title: title, target: self, action: #selector(openLink(_:)))
+        btn.bezelStyle = .inline
+        btn.isBordered = false
+        btn.controlSize = .small
+        btn.contentTintColor = NSColor.linkColor
+        let attr = NSMutableAttributedString(string: title, attributes: [
+            .foregroundColor: NSColor.linkColor,
+            .font: NSFont.systemFont(ofSize: 12, weight: .medium),
+            .underlineStyle: NSUnderlineStyle.single.rawValue,
+        ])
+        btn.attributedTitle = attr
+        btn.toolTip = url
+        objc_setAssociatedObject(btn, &Self.linkURLKey, url, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+        btn.translatesAutoresizingMaskIntoConstraints = false
+        return btn
+    }
+
+    private static var linkURLKey: UInt8 = 0
+
+    @objc private func openLink(_ sender: NSButton) {
+        guard let url = objc_getAssociatedObject(sender, &Self.linkURLKey) as? String,
+              let u = URL(string: url) else { return }
+        NSWorkspace.shared.open(u)
     }
 
     private func showProviderPanel(for key: String) {
