@@ -7,7 +7,7 @@ import Foundation
 ///   - "codex":            `codex exec --skip-git-repo-check --sandbox read-only -m MODEL "SYS\n\nTEXT"`
 enum Polisher {
     /// Default polish instruction — kept short on purpose. Users override via Settings.
-    static let defaultSystemPrompt = "Polish this voice-input transcript: remove filler words, fix obvious mis-recognitions, preserve the original language and meaning. Reply with the polished text only — no quotes, no markdown, no explanation."
+    static let defaultSystemPrompt = "Polish this voice-input transcript: remove filler words, fix obvious mis-recognitions, preserve the original language and meaning. Output the result as ONE single continuous line — NO line breaks, no newlines, no paragraph breaks. Reply with the polished text only — no quotes, no markdown, no explanation."
 
     static func polish(_ text: String,
                        backend: String,
@@ -128,6 +128,24 @@ enum Polisher {
         return result.map { stripCodexNoise($0) }
     }
 
+    /// Replace any sequence of newlines (and surrounding whitespace) with a single space,
+    /// then collapse runs of multiple spaces. Result is always a single line.
+    private static func collapseNewlines(_ s: String) -> String {
+        var out = ""
+        var prevWasSpace = false
+        for ch in s {
+            if ch == "\n" || ch == "\r" || ch == "\u{2028}" || ch == "\u{2029}" {
+                if !prevWasSpace { out.append(" "); prevWasSpace = true }
+            } else if ch == " " || ch == "\t" {
+                if !prevWasSpace { out.append(" "); prevWasSpace = true }
+            } else {
+                out.append(ch)
+                prevWasSpace = false
+            }
+        }
+        return out.trimmingCharacters(in: .whitespaces)
+    }
+
     /// Codex stdout layout (observed):
     ///
     ///     OpenAI Codex vX.Y
@@ -195,7 +213,11 @@ enum Polisher {
                                         userInfo: [NSLocalizedDescriptionKey: msg]))
             }
 
-            let polished = stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+            // Trim outer whitespace AND collapse any internal newlines to single spaces.
+            // Defense-in-depth: the prompt says "no line breaks", but if the LLM ignores
+            // that we still want a single-line result.
+            let trimmed = stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+            let polished = collapseNewlines(trimmed)
             if polished.isEmpty {
                 return .failure(NSError(domain: "Polisher", code: -3,
                                         userInfo: [NSLocalizedDescriptionKey: "\(label) 返回空"]))
