@@ -51,15 +51,54 @@ enum Strings {
     static var menuStatusInactive: String { L("状态：hotkey 未授权 ✗", "Status: hotkey NOT GRANTED ✗") }
     static var menuStatusStarting: String { L("状态：启动中…", "Status: starting…") }
 
-    // Settings window
+    // Settings window — header & sections
     static var settingsTitle: String { L("Murmur 设置", "Murmur Settings") }
+    static var settingsSecGeneral:  String { L("通用",     "General") }
+    static var settingsSecProvider: String { L("识别引擎", "STT Provider") }
+    static var settingsSecPolish:   String { L("润色",     "Polish") }
+    static var settingsSecGeneralHint:  String { L("识别语言与说话人设置", "Language hints and speaker behavior.") }
+    static var settingsSecProviderHint: String { L("选择实时语音识别服务，并填写对应 API key。", "Choose a real-time speech-to-text service and enter its API key.") }
+    static var settingsSecPolishHint:   String { L("识别完成后用 LLM 润色文字（可选）。", "Optionally polish the transcript with an LLM after recognition.") }
+
+    // Provider selector
+    static var settingsProviderSelect: String { L("识别服务", "Provider") }
+
+    // Provider display names
+    static var providerSoniox:   String { L("Soniox (stt-rt-preview)",  "Soniox (stt-rt-preview)") }
+    static var providerDeepgram: String { L("Deepgram (Nova-3)",        "Deepgram (Nova-3)") }
+    static var providerOpenAI:   String { L("OpenAI Realtime",          "OpenAI Realtime") }
+    static var providerCustom:   String { L("自定义 (OpenAI 兼容)",     "Custom (OpenAI-compatible)") }
+
+    // Soniox
     static var settingsSonioxKey: String { L("Soniox API Key", "Soniox API Key") }
+    static var settingsSonioxKeyHelp: String { L("从 console.soniox.com 获取。", "Get yours at console.soniox.com.") }
     static var settingsSonioxModel: String { L("Soniox 模型", "Soniox Model") }
-    static var settingsLangHints: String { L("识别语言（逗号分隔，如 zh,en）", "Language hints (comma-separated, e.g. zh,en)") }
-    static var settingsPolishBackend: String { L("润色工具", "Polish Tool") }
-    static var settingsPolishModel: String { L("润色模型", "Polish Model") }
+
+    // Deepgram
+    static var settingsDeepgramKey: String { L("Deepgram API Key", "Deepgram API Key") }
+    static var settingsDeepgramKeyHelp: String { L("console.deepgram.com → API Keys", "console.deepgram.com → API Keys") }
+    static var settingsDeepgramModel: String { L("Deepgram 模型", "Deepgram Model") }
+
+    // OpenAI
+    static var settingsOpenAIKey: String { L("OpenAI API Key", "OpenAI API Key") }
+    static var settingsOpenAIKeyHelp: String { L("platform.openai.com/api-keys", "platform.openai.com/api-keys") }
+    static var settingsOpenAIModel: String { L("OpenAI 模型", "OpenAI Model") }
+
+    // Custom
+    static var settingsCustomBaseUrl: String { L("Base URL (wss://…)", "Base URL (wss://…)") }
+    static var settingsCustomBaseUrlHelp: String { L("任何 OpenAI Realtime 兼容端点（Azure / vLLM / 私有部署等）。", "Any OpenAI-Realtime-compatible endpoint (Azure / vLLM / self-hosted).") }
+    static var settingsCustomKey: String { L("API Key", "API Key") }
+    static var settingsCustomModel: String { L("模型名称", "Model name") }
+    static var settingsCustomModelHelp: String { L("将在 transcription_session.update 中发送。", "Sent in transcription_session.update.") }
+
+    // Other
+    static var settingsLangHints: String { L("识别语言", "Language hints") }
+    static var settingsLangHintsHelp: String { L("勾选多个语言时，Deepgram 会自动切换到 multi 模式。", "Selecting multiple languages enables multilingual mode (e.g. Deepgram multi).") }
+    static var settingsPolishBackend: String { L("润色工具", "Polish backend") }
+    static var settingsPolishModel: String { L("润色模型", "Polish model") }
     static var settingsPolishPrompt: String { L("润色提示词（留空使用默认）", "Polish Prompt (leave empty for default)") }
-    static var settingsSpeakerLock: String { L("锁定主说话人（实验，默认关）", "Lock to primary speaker (experimental, default OFF)") }
+    static var settingsPolishPromptHelp: String { L("自定义 system prompt；留空时使用 Polisher 默认提示词。", "Custom system prompt; empty = built-in default.") }
+    static var settingsSpeakerLock: String { L("锁定主说话人（仅 Soniox，实验）", "Lock to primary speaker (Soniox only, experimental)") }
     static var settingsSpeakerLockHelp: String { L("基于 Soniox 在线说话人聚类。准确度有限，若身边总有干扰可试。", "Based on Soniox online speaker clustering. Limited accuracy — try if background voices interfere.") }
     static var settingsSave: String { L("保存", "Save") }
     static var settingsCancel: String { L("取消", "Cancel") }

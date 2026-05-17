@@ -8,7 +8,7 @@ import Foundation
 ///   3. Send binary PCM frames continuously
 ///   4. Send empty string to mark end-of-audio
 ///   5. Receive token messages with is_final flag; finalize when `finished: true`
-final class SonioxClient {
+final class SonioxClient: STTClient {
     private let apiKey: String
     private let model: String
     private let languageHints: [String]

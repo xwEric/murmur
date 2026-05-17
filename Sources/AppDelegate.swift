@@ -7,7 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let state = AppState()
     private var hotkey: HotkeyMonitor!
     private var recorder: AudioRecorder!
-    private var soniox: SonioxClient?
+    private var stt: STTClient?
     private var config: Config!
     private var permissionPollTimer: Timer?
     private let liveWindow = LiveTextWindow()
@@ -95,8 +95,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard state.phase != .idle else { return }
         NSLog("Murmur: Esc — cancel session (phase=\(state.phase))")
         recorder?.stop()
-        soniox?.cancel()
-        soniox = nil
+        stt?.cancel()
+        stt = nil
         liveWindow.hide()
         state.resetSession()
         state.set(.idle)
@@ -110,17 +110,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             state.set(.paused)
             liveWindow.setMode(.paused)
         case .paused:
-            let aliveSocket = soniox?.isAlive ?? false
+            let aliveSocket = stt?.isAlive ?? false
             NSLog("Murmur: Space — resume (socket alive=\(aliveSocket))")
             do {
                 try recorder.resume()
                 if !aliveSocket {
                     // Socket timed out during pause. Promote what we already have
-                    // to "committed" and start a fresh Soniox session that appends.
+                    // to "committed" and start a fresh STT session that appends.
                     state.promoteSessionToCommitted()
-                    let client = makeSonioxClient()
+                    let client = makeSTTClient()
                     client.connect()
-                    soniox = client
+                    stt = client
                     recorder.onAudio = { [weak client] data in client?.sendAudio(data) }
                     liveWindow.setText(state.raw)  // refresh display with committed text
                 }
@@ -141,6 +141,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSLog("Murmur: startRecording")
         state.resetSession()
 
+        // Validate config (API keys must be present for the selected provider).
+        if let err = config.validate() {
+            NSLog("Murmur: config invalid — \(err)")
+            showAlert(title: Strings.alertConfigMissing, body: err, style: .warning)
+            openSettings()
+            state.set(.idle)
+            return
+        }
+
         // Snapshot the frontmost app for focus restoration before pasting.
         targetApp = NSWorkspace.shared.frontmostApplication
         NSLog("Murmur: target app at record-start = \(targetApp?.localizedName ?? "?") pid=\(targetApp?.processIdentifier ?? -1)")
@@ -151,9 +160,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         liveWindow.setMode(.recording)
         liveWindow.setText("")
 
-        let client = makeSonioxClient()
+        let client = makeSTTClient()
         client.connect()
-        soniox = client
+        stt = client
 
         recorder.onAudio = { [weak client] data in client?.sendAudio(data) }
         do {
@@ -165,8 +174,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self.liveWindow.hide()
                 self.state.set(.idle)
             }
-            soniox?.cancel()
-            soniox = nil
+            stt?.cancel()
+            stt = nil
             return
         }
 
@@ -174,13 +183,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         verifyMicPermissionInBackground()
     }
 
-    /// Builds + wires a SonioxClient. Used both for initial connect and for mid-recording
-    /// reconnect (when the socket dies during pause).
-    private func makeSonioxClient() -> SonioxClient {
-        let client = SonioxClient(apiKey: config.apiKey,
-                                  model: config.model,
-                                  languageHints: config.languageHints,
-                                  speakerLock: config.speakerLock)
+    /// Builds + wires an STTClient via the factory. Used both for initial connect and
+    /// for mid-recording reconnect (when the socket dies during pause).
+    private func makeSTTClient() -> STTClient {
+        let client = STTClientFactory.make(config: config)
         client.onLiveUpdate = { [weak self] text in
             guard let self = self else { return }
             self.state.sessionText = text
@@ -194,7 +200,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             DispatchQueue.main.async {
                 self.state.sessionText = text.trimmingCharacters(in: .whitespacesAndNewlines)
                 let combined = self.state.raw.trimmingCharacters(in: .whitespacesAndNewlines)
-                self.soniox = nil
+                self.stt = nil
 
                 if combined.isEmpty {
                     self.liveWindow.setMode(.error(Strings.errEmptyTranscription))
@@ -224,7 +230,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         client.onError = { [weak self] err in
             guard let self = self else { return }
-            NSLog("Murmur: Soniox error: \(err.localizedDescription) (phase=\(self.state.phase))")
+            NSLog("Murmur: STT error: \(err.localizedDescription) (phase=\(self.state.phase))")
             DispatchQueue.main.async {
                 // If we're paused, the socket likely timed out — don't tear down.
                 // We'll reconnect on resume via onSpace().
@@ -239,7 +245,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     self.state.resetSession()
                     self.state.set(.idle)
                 }
-                self.soniox = nil
+                self.stt = nil
             }
         }
         return client
@@ -276,8 +282,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func abortRecording(reason: String) {
         NSLog("Murmur: abortRecording — \(reason)")
         recorder.stop()
-        soniox?.cancel()
-        soniox = nil
+        stt?.cancel()
+        stt = nil
         liveWindow.hide()
         state.resetSession()
         state.set(.idle)
@@ -306,7 +312,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         state.autoPolishAfterFinalize = autoPolish
         state.set(.finalizing)
         liveWindow.setMode(.finalizing)
-        soniox?.finish()
+        stt?.finish()
     }
 
     // MARK: - Polish

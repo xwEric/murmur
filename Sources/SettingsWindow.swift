@@ -5,7 +5,7 @@ struct LangOption {
     let display: String
 }
 
-let SonioxLanguages: [LangOption] = [
+let DictateLanguages: [LangOption] = [
     LangOption(code: "zh", display: "中文"),
     LangOption(code: "en", display: "English"),
     LangOption(code: "ja", display: "日本語"),
@@ -33,15 +33,53 @@ let PolishModels: [String: [String]] = [
 ]
 
 let SonioxModels: [String] = ["stt-rt-preview"]
+let DeepgramModels: [String] = ["nova-3", "nova-2", "enhanced", "base"]
+let OpenAIRealtimeModels: [String] = ["gpt-4o-mini-transcribe", "gpt-4o-transcribe"]
 
-final class SettingsWindow: NSObject, NSWindowDelegate {
+/// Sidebar sections in Settings.
+private enum SettingsSection: Int, CaseIterable {
+    case general
+    case provider
+    case polish
+
+    var title: String {
+        switch self {
+        case .general:  return Strings.settingsSecGeneral
+        case .provider: return Strings.settingsSecProvider
+        case .polish:   return Strings.settingsSecPolish
+        }
+    }
+}
+
+final class SettingsWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewDelegate {
     private var window: NSWindow!
     private let onSaved: (Config) -> Void
 
-    private var apiKeyField: NSSecureTextField!
-    private var sonioxModelPopup: NSPopUpButton!
+    // sidebar
+    private var sidebarTable: NSTableView!
+    private var detailContainer: NSView!
+    private var detailViews: [SettingsSection: NSView] = [:]
+    private var currentSection: SettingsSection = .general
+
+    // General section
     private var langCheckboxes: [String: NSButton] = [:]
     private var speakerLockCheckbox: NSButton!
+
+    // Provider section
+    private var providerPopup: NSPopUpButton!
+    private var providerStack: NSStackView!         // outer stack for provider section
+    private var providerPanels: [String: NSView] = [:]
+    private var sonioxKeyField: NSSecureTextField!
+    private var sonioxModelPopup: NSPopUpButton!
+    private var deepgramKeyField: NSSecureTextField!
+    private var deepgramModelPopup: NSPopUpButton!
+    private var openaiKeyField: NSSecureTextField!
+    private var openaiModelPopup: NSPopUpButton!
+    private var customBaseUrlField: NSTextField!
+    private var customKeyField: NSSecureTextField!
+    private var customModelField: NSTextField!
+
+    // Polish section
     private var backendPopup: NSPopUpButton!
     private var polishModelPopup: NSPopUpButton!
     private var polishPromptTextView: PlaceholderTextView!
@@ -51,117 +89,432 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         super.init()
     }
 
+    // MARK: - Public entry point
+
     func show() {
         if window == nil { build() }
         let current = (try? Config.load()) ?? Config(
-            apiKey: "",
-            model: Config.defaultSonioxModel,
+            sttProvider: Config.defaultSttProvider,
+            sonioxApiKey: "",
+            sonioxModel: Config.defaultSonioxModel,
+            deepgramApiKey: "",
+            deepgramModel: Config.defaultDeepgramModel,
+            openaiApiKey: "",
+            openaiModel: Config.defaultOpenAIModel,
+            customBaseUrl: "",
+            customApiKey: "",
+            customModel: Config.defaultCustomModel,
             languageHints: Config.defaultLanguageHints,
             polishBackend: Config.defaultPolishBackend,
             polishModel: Config.defaultPolishModelClaude,
-            speakerLock: false,
-            polishPrompt: ""
+            polishPrompt: "",
+            speakerLock: false
         )
-        apiKeyField.stringValue = current.apiKey
-
-        // Soniox model: ensure current is in the popup list, else add it
-        if !SonioxModels.contains(current.model) {
-            sonioxModelPopup.addItem(withTitle: current.model)
-        }
-        sonioxModelPopup.selectItem(withTitle: current.model)
-
-        // Language checkboxes
-        let selected = Set(current.languageHints)
-        for (code, box) in langCheckboxes {
-            box.state = selected.contains(code) ? .on : .off
-        }
-
-        // Speaker lock
-        speakerLockCheckbox.state = current.speakerLock ? .on : .off
-
-        // Backend
-        backendPopup.selectItem(withTitle: current.polishBackend)
-        rebuildPolishModelOptions(currentModel: current.polishModel)
-
-        // Polish prompt: text or empty (placeholder shows default)
-        polishPromptTextView.string = current.polishPrompt
+        populate(from: current)
 
         NSApp.activate(ignoringOtherApps: true)
         window.center()
         window.makeKeyAndOrderFront(nil)
     }
 
+    private func populate(from c: Config) {
+        // General
+        let selected = Set(c.languageHints)
+        for (code, box) in langCheckboxes { box.state = selected.contains(code) ? .on : .off }
+        speakerLockCheckbox.state = c.speakerLock ? .on : .off
+
+        // Provider selection
+        providerPopup.selectItem(withTitle: providerDisplay(c.sttProvider))
+        showProviderPanel(for: c.sttProvider)
+
+        // Provider field values
+        sonioxKeyField.stringValue = c.sonioxApiKey
+        if !SonioxModels.contains(c.sonioxModel) { sonioxModelPopup.addItem(withTitle: c.sonioxModel) }
+        sonioxModelPopup.selectItem(withTitle: c.sonioxModel)
+
+        deepgramKeyField.stringValue = c.deepgramApiKey
+        if !DeepgramModels.contains(c.deepgramModel) { deepgramModelPopup.addItem(withTitle: c.deepgramModel) }
+        deepgramModelPopup.selectItem(withTitle: c.deepgramModel)
+
+        openaiKeyField.stringValue = c.openaiApiKey
+        if !OpenAIRealtimeModels.contains(c.openaiModel) { openaiModelPopup.addItem(withTitle: c.openaiModel) }
+        openaiModelPopup.selectItem(withTitle: c.openaiModel)
+
+        customBaseUrlField.stringValue = c.customBaseUrl
+        customKeyField.stringValue = c.customApiKey
+        customModelField.stringValue = c.customModel
+
+        // Polish
+        backendPopup.selectItem(withTitle: c.polishBackend)
+        rebuildPolishModelOptions(currentModel: c.polishModel)
+        polishPromptTextView.string = c.polishPrompt
+
+        // Default section
+        selectSection(currentSection)
+    }
+
+    // MARK: - Layout
+
     private func build() {
-        let w: CGFloat = 560
+        let w: CGFloat = 720
+        let h: CGFloat = 520
 
         window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: w, height: 100),
-            styleMask: [.titled, .closable],
+            contentRect: NSRect(x: 0, y: 0, width: w, height: h),
+            styleMask: [.titled, .closable, .resizable, .miniaturizable],
             backing: .buffered, defer: false)
         window.title = Strings.settingsTitle
         window.delegate = self
         window.isReleasedWhenClosed = false
-
-        let stack = NSStackView()
-        stack.orientation = .vertical
-        stack.alignment = .leading
-        stack.spacing = 16
-        stack.edgeInsets = NSEdgeInsets(top: 20, left: 24, bottom: 20, right: 24)
-        stack.translatesAutoresizingMaskIntoConstraints = false
+        window.minSize = NSSize(width: 640, height: 460)
 
         let content = NSView()
         content.translatesAutoresizingMaskIntoConstraints = false
-        content.addSubview(stack)
-
         window.contentView = content
+
+        // Sidebar
+        let sidebarScroll = NSScrollView()
+        sidebarScroll.translatesAutoresizingMaskIntoConstraints = false
+        sidebarScroll.hasVerticalScroller = true
+        sidebarScroll.borderType = .noBorder
+        sidebarScroll.drawsBackground = false
+
+        sidebarTable = NSTableView()
+        sidebarTable.headerView = nil
+        sidebarTable.style = .sourceList
+        sidebarTable.selectionHighlightStyle = .regular
+        sidebarTable.intercellSpacing = NSSize(width: 0, height: 2)
+        sidebarTable.rowSizeStyle = .medium
+        sidebarTable.allowsMultipleSelection = false
+        let col = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("section"))
+        col.width = 180
+        sidebarTable.addTableColumn(col)
+        sidebarTable.dataSource = self
+        sidebarTable.delegate = self
+        sidebarTable.backgroundColor = .clear
+        sidebarScroll.documentView = sidebarTable
+
+        // Detail container
+        detailContainer = NSView()
+        detailContainer.translatesAutoresizingMaskIntoConstraints = false
+        detailContainer.wantsLayer = true
+
+        // Button bar
+        let cancelBtn = NSButton(title: Strings.settingsCancel, target: self, action: #selector(cancel))
+        cancelBtn.bezelStyle = .rounded
+        let saveBtn = NSButton(title: Strings.settingsSave, target: self, action: #selector(save))
+        saveBtn.bezelStyle = .rounded
+        saveBtn.keyEquivalent = "\r"
+        let spacer = NSView()
+        spacer.translatesAutoresizingMaskIntoConstraints = false
+        let buttonRow = NSStackView(views: [spacer, cancelBtn, saveBtn])
+        buttonRow.orientation = .horizontal
+        buttonRow.spacing = 10
+        buttonRow.translatesAutoresizingMaskIntoConstraints = false
+
+        content.addSubview(sidebarScroll)
+        content.addSubview(detailContainer)
+        content.addSubview(buttonRow)
+
         NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: content.leadingAnchor),
-            stack.trailingAnchor.constraint(equalTo: content.trailingAnchor),
-            stack.topAnchor.constraint(equalTo: content.topAnchor),
-            stack.bottomAnchor.constraint(equalTo: content.bottomAnchor),
+            sidebarScroll.leadingAnchor.constraint(equalTo: content.leadingAnchor),
+            sidebarScroll.topAnchor.constraint(equalTo: content.topAnchor),
+            sidebarScroll.bottomAnchor.constraint(equalTo: content.bottomAnchor),
+            sidebarScroll.widthAnchor.constraint(equalToConstant: 180),
+
+            detailContainer.leadingAnchor.constraint(equalTo: sidebarScroll.trailingAnchor),
+            detailContainer.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+            detailContainer.topAnchor.constraint(equalTo: content.topAnchor),
+            detailContainer.bottomAnchor.constraint(equalTo: buttonRow.topAnchor, constant: -12),
+
+            buttonRow.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -16),
+            buttonRow.leadingAnchor.constraint(equalTo: detailContainer.leadingAnchor, constant: 16),
+            buttonRow.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -16),
+            buttonRow.heightAnchor.constraint(equalToConstant: 28),
         ])
 
-        // API key (still a secure text field; the only free-text input)
-        apiKeyField = NSSecureTextField()
-        apiKeyField.placeholderString = "soniox API key"
-        apiKeyField.translatesAutoresizingMaskIntoConstraints = false
-        stack.addArrangedSubview(makeRow(label: Strings.settingsSonioxKey, field: apiKeyField, width: w))
+        // Build all section detail views ahead of time.
+        for section in SettingsSection.allCases {
+            let v = buildDetailView(for: section)
+            detailViews[section] = v
+        }
 
-        // Soniox model dropdown
+        // Default select first row
+        sidebarTable.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+        selectSection(.general)
+    }
+
+    private func buildDetailView(for section: SettingsSection) -> NSView {
+        switch section {
+        case .general:  return buildGeneralPanel()
+        case .provider: return buildProviderPanel()
+        case .polish:   return buildPolishPanel()
+        }
+    }
+
+    // MARK: - General panel
+
+    private func buildGeneralPanel() -> NSView {
+        let stack = makeSectionStack(title: Strings.settingsSecGeneral,
+                                     subtitle: Strings.settingsSecGeneralHint)
+
+        // Language picker
+        stack.addArrangedSubview(makeFieldLabel(Strings.settingsLangHints,
+                                                 help: Strings.settingsLangHintsHelp))
+        stack.addArrangedSubview(buildLanguageGrid())
+
+        stack.addArrangedSubview(makeDivider())
+
+        // Speaker lock
+        speakerLockCheckbox = NSButton(checkboxWithTitle: Strings.settingsSpeakerLock,
+                                       target: nil, action: nil)
+        let speakerHelp = makeHintLabel(Strings.settingsSpeakerLockHelp)
+        stack.addArrangedSubview(speakerLockCheckbox)
+        stack.addArrangedSubview(speakerHelp)
+
+        return wrapInScroll(stack)
+    }
+
+    private func buildLanguageGrid() -> NSView {
+        let columns = 3
+        let rowsPerCol = (DictateLanguages.count + columns - 1) / columns
+        var rows: [NSStackView] = []
+        for r in 0..<rowsPerCol {
+            let rowStack = NSStackView()
+            rowStack.orientation = .horizontal
+            rowStack.alignment = .firstBaseline
+            rowStack.spacing = 12
+            rowStack.distribution = .fillEqually
+            for c in 0..<columns {
+                let idx = c * rowsPerCol + r
+                if idx < DictateLanguages.count {
+                    let lang = DictateLanguages[idx]
+                    let cb = NSButton(checkboxWithTitle: "\(lang.display)  (\(lang.code))",
+                                      target: nil, action: nil)
+                    cb.translatesAutoresizingMaskIntoConstraints = false
+                    langCheckboxes[lang.code] = cb
+                    rowStack.addArrangedSubview(cb)
+                } else {
+                    rowStack.addArrangedSubview(NSView())
+                }
+            }
+            rows.append(rowStack)
+        }
+        let grid = NSStackView(views: rows)
+        grid.orientation = .vertical
+        grid.alignment = .leading
+        grid.spacing = 6
+        grid.translatesAutoresizingMaskIntoConstraints = false
+        return grid
+    }
+
+    // MARK: - Provider panel
+
+    private func buildProviderPanel() -> NSView {
+        let outer = makeSectionStack(title: Strings.settingsSecProvider,
+                                     subtitle: Strings.settingsSecProviderHint)
+
+        providerPopup = NSPopUpButton()
+        providerPopup.translatesAutoresizingMaskIntoConstraints = false
+        providerPopup.addItems(withTitles: [
+            providerDisplay("soniox"),
+            providerDisplay("deepgram"),
+            providerDisplay("openai"),
+            providerDisplay("custom"),
+        ])
+        providerPopup.target = self
+        providerPopup.action = #selector(providerChanged)
+
+        outer.addArrangedSubview(makeFieldLabel(Strings.settingsProviderSelect, help: nil))
+        outer.addArrangedSubview(providerPopup)
+        NSLayoutConstraint.activate([
+            providerPopup.widthAnchor.constraint(equalToConstant: 360),
+        ])
+
+        outer.addArrangedSubview(makeDivider())
+
+        // The container that swaps provider-specific panels
+        providerStack = NSStackView()
+        providerStack.orientation = .vertical
+        providerStack.alignment = .leading
+        providerStack.spacing = 12
+        providerStack.translatesAutoresizingMaskIntoConstraints = false
+        outer.addArrangedSubview(providerStack)
+
+        // Build per-provider sub-panels
+        providerPanels["soniox"] = buildSonioxPanel()
+        providerPanels["deepgram"] = buildDeepgramPanel()
+        providerPanels["openai"] = buildOpenAIPanel()
+        providerPanels["custom"] = buildCustomPanel()
+
+        return wrapInScroll(outer)
+    }
+
+    private func providerDisplay(_ key: String) -> String {
+        switch key {
+        case "soniox":   return Strings.providerSoniox
+        case "deepgram": return Strings.providerDeepgram
+        case "openai":   return Strings.providerOpenAI
+        case "custom":   return Strings.providerCustom
+        default:         return key
+        }
+    }
+
+    private func providerKey(fromDisplay s: String) -> String {
+        if s == Strings.providerSoniox   { return "soniox" }
+        if s == Strings.providerDeepgram { return "deepgram" }
+        if s == Strings.providerOpenAI   { return "openai" }
+        if s == Strings.providerCustom   { return "custom" }
+        return "soniox"
+    }
+
+    private func buildSonioxPanel() -> NSView {
+        let s = NSStackView()
+        s.orientation = .vertical
+        s.alignment = .leading
+        s.spacing = 12
+        s.translatesAutoresizingMaskIntoConstraints = false
+
+        sonioxKeyField = NSSecureTextField()
+        sonioxKeyField.placeholderString = "soniox API key"
+        sonioxKeyField.translatesAutoresizingMaskIntoConstraints = false
+        s.addArrangedSubview(makeFieldRow(label: Strings.settingsSonioxKey,
+                                          help: Strings.settingsSonioxKeyHelp,
+                                          field: sonioxKeyField))
+
         sonioxModelPopup = NSPopUpButton()
         sonioxModelPopup.addItems(withTitles: SonioxModels)
         sonioxModelPopup.translatesAutoresizingMaskIntoConstraints = false
-        stack.addArrangedSubview(makeRow(label: Strings.settingsSonioxModel, field: sonioxModelPopup, width: w))
+        s.addArrangedSubview(makeFieldRow(label: Strings.settingsSonioxModel,
+                                          help: nil,
+                                          field: sonioxModelPopup))
+        return s
+    }
 
-        // Language multi-select grid
-        stack.addArrangedSubview(makeLangSection(width: w))
+    private func buildDeepgramPanel() -> NSView {
+        let s = NSStackView()
+        s.orientation = .vertical
+        s.alignment = .leading
+        s.spacing = 12
+        s.translatesAutoresizingMaskIntoConstraints = false
 
-        // Speaker lock toggle
-        speakerLockCheckbox = NSButton(checkboxWithTitle: Strings.settingsSpeakerLock,
-                                       target: nil, action: nil)
-        let speakerHelp = NSTextField(labelWithString: Strings.settingsSpeakerLockHelp)
-        speakerHelp.font = .systemFont(ofSize: 10)
-        speakerHelp.textColor = NSColor.tertiaryLabelColor
-        let speakerStack = NSStackView(views: [speakerLockCheckbox, speakerHelp])
-        speakerStack.orientation = .vertical
-        speakerStack.alignment = .leading
-        speakerStack.spacing = 2
-        stack.addArrangedSubview(speakerStack)
+        deepgramKeyField = NSSecureTextField()
+        deepgramKeyField.placeholderString = "deepgram API key"
+        deepgramKeyField.translatesAutoresizingMaskIntoConstraints = false
+        s.addArrangedSubview(makeFieldRow(label: Strings.settingsDeepgramKey,
+                                          help: Strings.settingsDeepgramKeyHelp,
+                                          field: deepgramKeyField))
 
-        // Polish backend dropdown
+        deepgramModelPopup = NSPopUpButton()
+        deepgramModelPopup.addItems(withTitles: DeepgramModels)
+        deepgramModelPopup.translatesAutoresizingMaskIntoConstraints = false
+        s.addArrangedSubview(makeFieldRow(label: Strings.settingsDeepgramModel,
+                                          help: nil,
+                                          field: deepgramModelPopup))
+        return s
+    }
+
+    private func buildOpenAIPanel() -> NSView {
+        let s = NSStackView()
+        s.orientation = .vertical
+        s.alignment = .leading
+        s.spacing = 12
+        s.translatesAutoresizingMaskIntoConstraints = false
+
+        openaiKeyField = NSSecureTextField()
+        openaiKeyField.placeholderString = "sk-..."
+        openaiKeyField.translatesAutoresizingMaskIntoConstraints = false
+        s.addArrangedSubview(makeFieldRow(label: Strings.settingsOpenAIKey,
+                                          help: Strings.settingsOpenAIKeyHelp,
+                                          field: openaiKeyField))
+
+        openaiModelPopup = NSPopUpButton()
+        openaiModelPopup.addItems(withTitles: OpenAIRealtimeModels)
+        openaiModelPopup.translatesAutoresizingMaskIntoConstraints = false
+        s.addArrangedSubview(makeFieldRow(label: Strings.settingsOpenAIModel,
+                                          help: nil,
+                                          field: openaiModelPopup))
+        return s
+    }
+
+    private func buildCustomPanel() -> NSView {
+        let s = NSStackView()
+        s.orientation = .vertical
+        s.alignment = .leading
+        s.spacing = 12
+        s.translatesAutoresizingMaskIntoConstraints = false
+
+        customBaseUrlField = NSTextField()
+        customBaseUrlField.placeholderString = "wss://your-endpoint/v1/realtime?intent=transcription"
+        customBaseUrlField.translatesAutoresizingMaskIntoConstraints = false
+        s.addArrangedSubview(makeFieldRow(label: Strings.settingsCustomBaseUrl,
+                                          help: Strings.settingsCustomBaseUrlHelp,
+                                          field: customBaseUrlField))
+
+        customKeyField = NSSecureTextField()
+        customKeyField.placeholderString = "API key (sent as Bearer token)"
+        customKeyField.translatesAutoresizingMaskIntoConstraints = false
+        s.addArrangedSubview(makeFieldRow(label: Strings.settingsCustomKey,
+                                          help: nil,
+                                          field: customKeyField))
+
+        customModelField = NSTextField()
+        customModelField.placeholderString = "gpt-4o-mini-transcribe"
+        customModelField.translatesAutoresizingMaskIntoConstraints = false
+        s.addArrangedSubview(makeFieldRow(label: Strings.settingsCustomModel,
+                                          help: Strings.settingsCustomModelHelp,
+                                          field: customModelField))
+
+        return s
+    }
+
+    private func showProviderPanel(for key: String) {
+        // Remove old panels from providerStack
+        for sub in providerStack.arrangedSubviews { providerStack.removeArrangedSubview(sub); sub.removeFromSuperview() }
+        if let panel = providerPanels[key] {
+            providerStack.addArrangedSubview(panel)
+            if panel is NSStackView {
+                // ensure width grows to detail container
+                NSLayoutConstraint.activate([
+                    panel.widthAnchor.constraint(greaterThanOrEqualToConstant: 480),
+                ])
+            }
+        }
+    }
+
+    @objc private func providerChanged() {
+        let display = providerPopup.titleOfSelectedItem ?? ""
+        let key = providerKey(fromDisplay: display)
+        showProviderPanel(for: key)
+    }
+
+    // MARK: - Polish panel
+
+    private func buildPolishPanel() -> NSView {
+        let s = makeSectionStack(title: Strings.settingsSecPolish,
+                                  subtitle: Strings.settingsSecPolishHint)
+
         backendPopup = NSPopUpButton()
         backendPopup.addItems(withTitles: ["claude", "codex"])
         backendPopup.target = self
         backendPopup.action = #selector(backendChanged)
         backendPopup.translatesAutoresizingMaskIntoConstraints = false
-        stack.addArrangedSubview(makeRow(label: Strings.settingsPolishBackend, field: backendPopup, width: w))
+        s.addArrangedSubview(makeFieldRow(label: Strings.settingsPolishBackend,
+                                          help: nil,
+                                          field: backendPopup))
 
-        // Polish model dropdown (populated based on backend)
         polishModelPopup = NSPopUpButton()
         polishModelPopup.translatesAutoresizingMaskIntoConstraints = false
-        stack.addArrangedSubview(makeRow(label: Strings.settingsPolishModel, field: polishModelPopup, width: w))
+        s.addArrangedSubview(makeFieldRow(label: Strings.settingsPolishModel,
+                                          help: nil,
+                                          field: polishModelPopup))
 
-        // Polish prompt (multi-line editable with placeholder)
+        s.addArrangedSubview(makeDivider())
+
+        // Polish prompt (multi-line)
+        s.addArrangedSubview(makeFieldLabel(Strings.settingsPolishPrompt,
+                                             help: Strings.settingsPolishPromptHelp))
+
         let promptScroll = NSScrollView()
         promptScroll.borderType = .bezelBorder
         promptScroll.hasVerticalScroller = true
@@ -181,107 +534,13 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         polishPromptTextView.textContainerInset = NSSize(width: 4, height: 4)
         promptScroll.documentView = polishPromptTextView
 
-        stack.addArrangedSubview(makePromptRow(label: Strings.settingsPolishPrompt,
-                                               scroll: promptScroll, width: w))
-
-        // Buttons
-        let cancelBtn = NSButton(title: Strings.settingsCancel, target: self, action: #selector(cancel))
-        cancelBtn.bezelStyle = .rounded
-        let saveBtn = NSButton(title: Strings.settingsSave, target: self, action: #selector(save))
-        saveBtn.bezelStyle = .rounded
-        saveBtn.keyEquivalent = "\r"
-        let spacer = NSView()
-        spacer.translatesAutoresizingMaskIntoConstraints = false
-        let buttonRow = NSStackView(views: [spacer, cancelBtn, saveBtn])
-        buttonRow.orientation = .horizontal
-        buttonRow.spacing = 10
-        buttonRow.translatesAutoresizingMaskIntoConstraints = false
-        stack.addArrangedSubview(buttonRow)
         NSLayoutConstraint.activate([
-            buttonRow.widthAnchor.constraint(equalToConstant: w - 48),
-            spacer.heightAnchor.constraint(equalToConstant: 1),
+            promptScroll.heightAnchor.constraint(equalToConstant: 180),
+            promptScroll.widthAnchor.constraint(greaterThanOrEqualToConstant: 480),
         ])
+        s.addArrangedSubview(promptScroll)
 
-        window.setContentSize(stack.fittingSize)
-    }
-
-    private func makeRow(label: String, field: NSView, width: CGFloat) -> NSView {
-        let lbl = NSTextField(labelWithString: label)
-        lbl.font = .systemFont(ofSize: 11, weight: .semibold)
-        lbl.textColor = NSColor.secondaryLabelColor
-        let row = NSStackView(views: [lbl, field])
-        row.orientation = .vertical
-        row.alignment = .leading
-        row.spacing = 4
-        row.translatesAutoresizingMaskIntoConstraints = false
-        field.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            field.widthAnchor.constraint(equalToConstant: width - 48),
-        ])
-        return row
-    }
-
-    private func makePromptRow(label: String, scroll: NSView, width: CGFloat) -> NSView {
-        let lbl = NSTextField(labelWithString: label)
-        lbl.font = .systemFont(ofSize: 11, weight: .semibold)
-        lbl.textColor = NSColor.secondaryLabelColor
-        let row = NSStackView(views: [lbl, scroll])
-        row.orientation = .vertical
-        row.alignment = .leading
-        row.spacing = 4
-        row.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            scroll.widthAnchor.constraint(equalToConstant: width - 48),
-            scroll.heightAnchor.constraint(equalToConstant: 80),
-        ])
-        return row
-    }
-
-    private func makeLangSection(width: CGFloat) -> NSView {
-        let title = NSTextField(labelWithString: Strings.settingsLangHints)
-        title.font = .systemFont(ofSize: 11, weight: .semibold)
-        title.textColor = NSColor.secondaryLabelColor
-
-        let columns = 3
-        let rowsPerCol = (SonioxLanguages.count + columns - 1) / columns
-        var rows: [NSStackView] = []
-        for r in 0..<rowsPerCol {
-            let rowStack = NSStackView()
-            rowStack.orientation = .horizontal
-            rowStack.alignment = .firstBaseline
-            rowStack.spacing = 12
-            rowStack.distribution = .fillEqually
-            for c in 0..<columns {
-                let idx = c * rowsPerCol + r
-                if idx < SonioxLanguages.count {
-                    let lang = SonioxLanguages[idx]
-                    let cb = NSButton(checkboxWithTitle: "\(lang.display)  (\(lang.code))",
-                                      target: nil, action: nil)
-                    cb.translatesAutoresizingMaskIntoConstraints = false
-                    langCheckboxes[lang.code] = cb
-                    rowStack.addArrangedSubview(cb)
-                } else {
-                    rowStack.addArrangedSubview(NSView())
-                }
-            }
-            rows.append(rowStack)
-        }
-
-        let grid = NSStackView(views: rows)
-        grid.orientation = .vertical
-        grid.alignment = .leading
-        grid.spacing = 6
-        grid.translatesAutoresizingMaskIntoConstraints = false
-
-        let container = NSStackView(views: [title, grid])
-        container.orientation = .vertical
-        container.alignment = .leading
-        container.spacing = 6
-        container.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            grid.widthAnchor.constraint(equalToConstant: width - 48),
-        ])
-        return container
+        return wrapInScroll(s)
     }
 
     private func rebuildPolishModelOptions(currentModel: String?) {
@@ -292,7 +551,6 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         if let m = currentModel, options.contains(m) {
             polishModelPopup.selectItem(withTitle: m)
         } else {
-            // Pick a sensible default for this backend
             let def = backend == "codex" ? Config.defaultPolishModelCodex : Config.defaultPolishModelClaude
             if options.contains(def) {
                 polishModelPopup.selectItem(withTitle: def)
@@ -306,51 +564,246 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         rebuildPolishModelOptions(currentModel: nil)
     }
 
+    // MARK: - Helpers
+
+    private func makeSectionStack(title: String, subtitle: String) -> NSStackView {
+        let s = NSStackView()
+        s.orientation = .vertical
+        s.alignment = .leading
+        s.spacing = 14
+        s.edgeInsets = NSEdgeInsets(top: 24, left: 24, bottom: 24, right: 24)
+        s.translatesAutoresizingMaskIntoConstraints = false
+
+        let h = NSTextField(labelWithString: title)
+        h.font = .systemFont(ofSize: 18, weight: .semibold)
+        h.textColor = NSColor.labelColor
+        s.addArrangedSubview(h)
+
+        if !subtitle.isEmpty {
+            let sub = NSTextField(labelWithString: subtitle)
+            sub.font = .systemFont(ofSize: 11)
+            sub.textColor = NSColor.secondaryLabelColor
+            sub.lineBreakMode = .byWordWrapping
+            sub.maximumNumberOfLines = 0
+            sub.preferredMaxLayoutWidth = 480
+            s.addArrangedSubview(sub)
+        }
+        return s
+    }
+
+    private func makeFieldLabel(_ text: String, help: String?) -> NSStackView {
+        let lbl = NSTextField(labelWithString: text)
+        lbl.font = .systemFont(ofSize: 11, weight: .semibold)
+        lbl.textColor = NSColor.secondaryLabelColor
+        let inner = NSStackView()
+        inner.orientation = .vertical
+        inner.alignment = .leading
+        inner.spacing = 2
+        inner.translatesAutoresizingMaskIntoConstraints = false
+        inner.addArrangedSubview(lbl)
+        if let help = help, !help.isEmpty {
+            inner.addArrangedSubview(makeHintLabel(help))
+        }
+        return inner
+    }
+
+    private func makeFieldRow(label: String, help: String?, field: NSView) -> NSView {
+        let outer = NSStackView()
+        outer.orientation = .vertical
+        outer.alignment = .leading
+        outer.spacing = 4
+        outer.translatesAutoresizingMaskIntoConstraints = false
+
+        let lbl = NSTextField(labelWithString: label)
+        lbl.font = .systemFont(ofSize: 11, weight: .semibold)
+        lbl.textColor = NSColor.secondaryLabelColor
+        outer.addArrangedSubview(lbl)
+
+        field.translatesAutoresizingMaskIntoConstraints = false
+        outer.addArrangedSubview(field)
+
+        if let help = help, !help.isEmpty {
+            outer.addArrangedSubview(makeHintLabel(help))
+        }
+
+        NSLayoutConstraint.activate([
+            field.widthAnchor.constraint(equalToConstant: 480),
+        ])
+        return outer
+    }
+
+    private func makeHintLabel(_ s: String) -> NSTextField {
+        let h = NSTextField(labelWithString: s)
+        h.font = .systemFont(ofSize: 10)
+        h.textColor = NSColor.tertiaryLabelColor
+        h.lineBreakMode = .byWordWrapping
+        h.maximumNumberOfLines = 0
+        h.preferredMaxLayoutWidth = 480
+        return h
+    }
+
+    private func makeDivider() -> NSView {
+        let line = NSBox()
+        line.boxType = .separator
+        line.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            line.heightAnchor.constraint(equalToConstant: 1),
+            line.widthAnchor.constraint(equalToConstant: 480),
+        ])
+        return line
+    }
+
+    private func wrapInScroll(_ inner: NSView) -> NSView {
+        let scroll = NSScrollView()
+        scroll.hasVerticalScroller = true
+        scroll.autohidesScrollers = true
+        scroll.borderType = .noBorder
+        scroll.drawsBackground = false
+        scroll.translatesAutoresizingMaskIntoConstraints = false
+
+        let docView = FlippedView()
+        docView.translatesAutoresizingMaskIntoConstraints = false
+        docView.addSubview(inner)
+        NSLayoutConstraint.activate([
+            inner.leadingAnchor.constraint(equalTo: docView.leadingAnchor),
+            inner.trailingAnchor.constraint(lessThanOrEqualTo: docView.trailingAnchor),
+            inner.topAnchor.constraint(equalTo: docView.topAnchor),
+            inner.bottomAnchor.constraint(equalTo: docView.bottomAnchor),
+        ])
+
+        scroll.documentView = docView
+        return scroll
+    }
+
+    // MARK: - Section switching
+
+    private func selectSection(_ section: SettingsSection) {
+        currentSection = section
+        for sub in detailContainer.subviews { sub.removeFromSuperview() }
+        guard let v = detailViews[section] else { return }
+        v.translatesAutoresizingMaskIntoConstraints = false
+        detailContainer.addSubview(v)
+        NSLayoutConstraint.activate([
+            v.leadingAnchor.constraint(equalTo: detailContainer.leadingAnchor),
+            v.trailingAnchor.constraint(equalTo: detailContainer.trailingAnchor),
+            v.topAnchor.constraint(equalTo: detailContainer.topAnchor),
+            v.bottomAnchor.constraint(equalTo: detailContainer.bottomAnchor),
+        ])
+    }
+
+    // MARK: - NSTableViewDataSource / Delegate
+
+    func numberOfRows(in tableView: NSTableView) -> Int {
+        SettingsSection.allCases.count
+    }
+
+    func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+        let section = SettingsSection.allCases[row]
+        let cell = NSTableCellView()
+        let label = NSTextField(labelWithString: section.title)
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.font = .systemFont(ofSize: 13)
+        cell.addSubview(label)
+        NSLayoutConstraint.activate([
+            label.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 8),
+            label.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+            label.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -8),
+        ])
+        return cell
+    }
+
+    func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat { 28 }
+
+    func tableViewSelectionDidChange(_ notification: Notification) {
+        let row = sidebarTable.selectedRow
+        guard row >= 0, row < SettingsSection.allCases.count else { return }
+        selectSection(SettingsSection.allCases[row])
+    }
+
+    // MARK: - Save / Cancel
+
     @objc private func cancel() { window.close() }
 
     @objc private func save() {
-        let apiKey = apiKeyField.stringValue.trimmingCharacters(in: .whitespaces)
-        guard !apiKey.isEmpty else {
-            let alert = NSAlert()
-            alert.messageText = Strings.settingsSonioxKey
-            alert.informativeText = "API key required."
-            alert.runModal()
-            return
-        }
+        // Selected provider
+        let providerDisplayName = providerPopup.titleOfSelectedItem ?? Strings.providerSoniox
+        let provider = providerKey(fromDisplay: providerDisplayName)
 
+        // Pull each provider's fields (always save all so the user doesn't lose them when switching)
+        let sonioxKey = sonioxKeyField.stringValue.trimmingCharacters(in: .whitespaces)
         let sonioxModel = sonioxModelPopup.titleOfSelectedItem ?? Config.defaultSonioxModel
 
+        let deepgramKey = deepgramKeyField.stringValue.trimmingCharacters(in: .whitespaces)
+        let deepgramModel = deepgramModelPopup.titleOfSelectedItem ?? Config.defaultDeepgramModel
+
+        let openaiKey = openaiKeyField.stringValue.trimmingCharacters(in: .whitespaces)
+        let openaiModel = openaiModelPopup.titleOfSelectedItem ?? Config.defaultOpenAIModel
+
+        let customUrl = customBaseUrlField.stringValue.trimmingCharacters(in: .whitespaces)
+        let customKey = customKeyField.stringValue.trimmingCharacters(in: .whitespaces)
+        let customModel = customModelField.stringValue.trimmingCharacters(in: .whitespaces)
+
+        // Validate selected provider
+        switch provider {
+        case "soniox" where sonioxKey.isEmpty:
+            showInline(title: Strings.settingsSonioxKey, body: "API key required."); return
+        case "deepgram" where deepgramKey.isEmpty:
+            showInline(title: Strings.settingsDeepgramKey, body: "API key required."); return
+        case "openai" where openaiKey.isEmpty:
+            showInline(title: Strings.settingsOpenAIKey, body: "API key required."); return
+        case "custom" where customUrl.isEmpty || customKey.isEmpty:
+            showInline(title: Strings.providerCustom, body: "Base URL and API key required."); return
+        default: break
+        }
+
+        // Languages
         var selectedCodes: [String] = []
-        for lang in SonioxLanguages {
+        for lang in DictateLanguages {
             if langCheckboxes[lang.code]?.state == .on { selectedCodes.append(lang.code) }
         }
         if selectedCodes.isEmpty { selectedCodes = Config.defaultLanguageHints }
 
+        // Polish
         let backend = backendPopup.titleOfSelectedItem ?? Config.defaultPolishBackend
         let polishModel = polishModelPopup.titleOfSelectedItem
             ?? (backend == "codex" ? Config.defaultPolishModelCodex : Config.defaultPolishModelClaude)
-
-        // Polish prompt: store whatever user typed (trimmed). Empty = use built-in default.
         let polishPrompt = polishPromptTextView.string.trimmingCharacters(in: .whitespacesAndNewlines)
 
         let cfg = Config(
-            apiKey: apiKey,
-            model: sonioxModel,
+            sttProvider: provider,
+            sonioxApiKey: sonioxKey,
+            sonioxModel: sonioxModel,
+            deepgramApiKey: deepgramKey,
+            deepgramModel: deepgramModel,
+            openaiApiKey: openaiKey,
+            openaiModel: openaiModel,
+            customBaseUrl: customUrl,
+            customApiKey: customKey,
+            customModel: customModel.isEmpty ? Config.defaultCustomModel : customModel,
             languageHints: selectedCodes,
             polishBackend: backend,
             polishModel: polishModel,
-            speakerLock: speakerLockCheckbox.state == .on,
-            polishPrompt: polishPrompt
+            polishPrompt: polishPrompt,
+            speakerLock: speakerLockCheckbox.state == .on
         )
         do {
             try cfg.save()
             onSaved(cfg)
             window.close()
         } catch {
-            let alert = NSAlert()
-            alert.messageText = "Save failed"
-            alert.informativeText = error.localizedDescription
-            alert.runModal()
+            showInline(title: "Save failed", body: error.localizedDescription)
         }
     }
+
+    private func showInline(title: String, body: String) {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = body
+        alert.runModal()
+    }
+}
+
+/// Flipped NSView so the scrollable doc lays out top-down naturally.
+private final class FlippedView: NSView {
+    override var isFlipped: Bool { true }
 }

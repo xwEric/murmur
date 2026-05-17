@@ -12,7 +12,7 @@
 
 ## ✨ 为什么选 Murmur
 
-1. **没有月费。** 别人动辄每月 $10–20，Murmur 完全按需付费 —— 你用自己的 Soniox key，按说话时间计费（典型约 $0.05/小时）。
+1. **没有月费。** 别人动辄每月 $10–20，Murmur 完全按需付费 —— 你用自己的 API key，按用量计费。
 2. **开源 + 零数据存储。** MIT 协议，不存储任何用户信息，也不经过任何中间服务器，绝对安全。
 3. **AI 润色不产生任何额外费用。** 直接调用本机已登录的 `claude` 或 `codex` CLI，复用你已有的订阅，Murmur 不在中间再加钱。
 4. **支持暂停录音。** 录音中按空格暂停，再按空格继续；可以暂停多次，socket 超时也会自动 reconnect。
@@ -22,11 +22,11 @@
 
 ## 🎯 核心特性
 
-1. **实时语音识别**（Soniox WebSocket，约 500ms 首字延迟）
-2. **AI 润色** —— 按 Alt 触发本机 `claude` / `codex` CLI 去除赘词，prompt 可自定义
-3. **多语言识别** —— 设置页可多选 18 种语言
-4. **声纹开关** —— 开启后以第一位说话者的声纹为锁定基准，其他人的声音不会被录入，有效避免旁人干扰
-5. **断点续录** —— 随时暂停、随时继续，多次暂停也支持，已识别文字不丢
+1. **实时语音识别** — 多个 provider 可选：**Soniox**、**Deepgram Nova-3**、**OpenAI Realtime (gpt-4o-mini-transcribe)**，或任何 **OpenAI 兼容**自定义端点
+2. **AI 润色** — 按 Alt 触发本机 `claude` / `codex` CLI 去除赘词，prompt 可自定义
+3. **多语言识别** — 设置页可多选 18 种语言
+4. **声纹开关**（仅 Soniox）— 开启后以第一位说话者的声纹为锁定基准，其他人的声音不会被录入，有效避免旁人干扰
+5. **断点续录** — 随时暂停、随时继续，多次暂停也支持，已识别文字不丢
 
 ---
 
@@ -41,13 +41,49 @@
 
 ---
 
+## 🔑 获取 API key（任选一家）
+
+只需要 **任意一家** provider 的 key 就能用，可以在 Settings 里随时切换。
+
+### Soniox（默认，多语言最好）
+
+1. 去 [console.soniox.com](https://console.soniox.com) 注册（Google 登录可用）
+2. 注册有免费额度，之后 ~$0.04 / 分钟音频
+3. **Settings → API Keys → Create new key** → 复制
+4. Murmur 设置 → 识别引擎 → Soniox → 粘贴
+
+### Deepgram Nova-3（快、英文优化）
+
+1. 去 [console.deepgram.com](https://console.deepgram.com) 注册
+2. 新账号送 $200 免费额度（够用很久）
+3. **API Keys → Create a New API Key** → 角色选 *Member* → 复制
+4. Murmur 设置 → 识别引擎 → Deepgram → 粘贴
+
+### OpenAI Realtime (gpt-4o-mini-transcribe)
+
+1. 去 [platform.openai.com/api-keys](https://platform.openai.com/api-keys) 创建 key
+2. 确认账户开通了 Realtime API 访问（大多付费账户都有）
+3. Murmur 设置 → 识别引擎 → OpenAI Realtime → 粘贴
+4. 默认模型是 `gpt-4o-mini-transcribe`；可选 `gpt-4o-transcribe` 质量更高
+
+### 自定义（OpenAI 兼容）
+
+适合 Azure OpenAI、自建 vLLM、或任何实现了 OpenAI Realtime API 的服务：
+
+1. Murmur 设置 → 识别引擎 → 自定义
+2. **Base URL**：`wss://your-host/v1/realtime?intent=transcription`（按你的服务商）
+3. **API Key**：服务商在 `Authorization: Bearer` header 里期望的值
+4. **模型名称**：会作为 `transcription_session.update` 的 model 字段发出去
+
+---
+
 ## ⚡ 快速安装
 
 **前置依赖**
 
 - macOS 13+，Apple Silicon
 - Xcode CommandLine Tools（`xcode-select --install`）
-- [Soniox](https://soniox.com) 账号 + API key（小额免费额度，之后按用量付费）
+- 以上任一 provider 的 API key
 - *可选* —— [`claude`](https://claude.com/claude-code) 或 `codex` CLI 已安装并登录（仅润色功能需要；基础录音不需要）
 
 **1 · 构建**
@@ -61,12 +97,12 @@ open build/Murmur.app
 
 **2 · 首次运行设置**（一次性）
 
-启动后菜单栏会出现 🍌 小香蕉。第一次运行时：
+启动后菜单栏会出现六边形小图标。第一次运行时：
 
 1. **麦克风权限** —— 系统弹窗，点 **允许**
-2. **辅助功能权限** —— 菜单栏 🍌 → *"打开辅助功能设置"* → 把 `Murmur.app` 加入列表并打开开关
+2. **辅助功能权限** —— 菜单栏图标 → *"打开辅助功能设置"* → 把 `Murmur.app` 加入列表并打开开关
 3. **退出并重新启动 Murmur**（macOS 会重新校验签名，权限需要重启才生效）
-4. 打开设置（菜单栏 🍌 → *"设置…"*）粘贴你的 Soniox API key
+4. 打开设置（菜单栏图标 → *"设置…"*）→ 识别引擎 → 粘贴你的 API key
 
 **3 · 开始使用**
 
@@ -87,18 +123,31 @@ open build/Murmur.app
 
 ## 💡 核心理念
 
-**只为我说过的每一句话付钱。** 没有月费，音频从你的电脑直接送到 Soniox（用你自己的 key），AI 润色经过你已登录的本机 CLI —— Murmur 只是把这些服务串起来的最薄一层。
+**只为我说过的每一句话付钱。** 没有月费，音频从你的电脑直接送到你选的 STT provider（用你自己的 key），AI 润色经过你已登录的本机 CLI —— Murmur 只是把这些服务串起来的最薄一层。
 
 ---
 
 ## ⚙️ 配置
 
-配置文件位于 `~/.claude-profile/dictate/config.json`：
+配置文件位于 `~/.claude-profile/dictate/config.json`。基本上都能在设置页面里改，但也可以直接编辑：
 
 ```json
 {
-  "soniox_api_key": "YOUR_KEY_FROM_console.soniox.com",
-  "model": "stt-rt-preview",
+  "stt_provider": "soniox",
+
+  "soniox_api_key": "...",
+  "soniox_model": "stt-rt-preview",
+
+  "deepgram_api_key": "...",
+  "deepgram_model": "nova-3",
+
+  "openai_api_key": "...",
+  "openai_model": "gpt-4o-mini-transcribe",
+
+  "custom_base_url": "",
+  "custom_api_key": "",
+  "custom_model": "",
+
   "language_hints": ["zh", "en"],
   "polish_backend": "claude",
   "polish_model": "sonnet",
@@ -107,15 +156,15 @@ open build/Murmur.app
 }
 ```
 
-| 字段 | 默认 | 说明 |
-|---|---|---|
-| `soniox_api_key` | — | 从 [console.soniox.com](https://console.soniox.com) 拿 |
-| `model` | `stt-rt-preview` | Soniox 实时模型名 |
-| `language_hints` | `["zh","en"]` | 识别语言列表（影响识别质量） |
-| `polish_backend` | `claude` | `claude` 或 `codex` |
-| `polish_model` | `sonnet` | claude: `sonnet`/`haiku`/`opus`；codex: `gpt-5-codex` 等 |
-| `polish_prompt` | `""` | 空字符串 = 使用内置 prompt；非空 = 你自定义的 prompt |
-| `speaker_lock` | `false` | 实验功能 — 锁定第一个识别到的说话人，过滤其他人 |
+| 字段 | 说明 |
+|---|---|
+| `stt_provider` | `soniox` \| `deepgram` \| `openai` \| `custom` |
+| `*_api_key` / `*_model` | 每个 provider 自己的 key + model；只有当前激活的那组生效 |
+| `custom_base_url` | OpenAI-Realtime 兼容的 WSS 端点（仅当 `stt_provider=custom` 时使用）|
+| `language_hints` | 识别语言列表；Deepgram 选多于一种会自动切到 multi 模式 |
+| `polish_backend` | `claude` 或 `codex` |
+| `polish_prompt` | 空字符串 = 使用内置默认；非空 = 你自定义的 system prompt |
+| `speaker_lock` | 实验功能，仅 Soniox —— 锁定第一个识别到的说话人 |
 
 ---
 
@@ -123,26 +172,31 @@ open build/Murmur.app
 
 ```
 ~/code/dictate/
-├── Sources/                       # 13 个 Swift 文件
+├── Sources/                       # 18 个 Swift 文件
 │   ├── main.swift                 # @main 入口
 │   ├── AppDelegate.swift          # 主控制器 + 状态机
 │   ├── AppState.swift             # idle / recording / paused / finalizing / polishing / reviewing
 │   ├── HotkeyMonitor.swift        # CGEventTap — Right ⌘ / Alt / Space / Esc
 │   ├── AudioRecorder.swift        # AVAudioEngine → 16 kHz mono PCM16
-│   ├── SonioxClient.swift         # WebSocket 客户端 + 声纹过滤 + 断点续录
+│   ├── STTClient.swift            # 流式 STT 后端的协议
+│   ├── STTClientFactory.swift     # 按 config 选择对应的 client
+│   ├── SonioxClient.swift         # Soniox 实时 WebSocket
+│   ├── DeepgramClient.swift       # Deepgram Nova-3 WebSocket
+│   ├── OpenAIRealtimeClient.swift # OpenAI Realtime (gpt-4o-mini-transcribe)
+│   ├── CustomSTTClient.swift      # OpenAI 兼容自定义端点
 │   ├── Polisher.swift             # 派生 claude / codex CLI 做润色
 │   ├── TextInjector.swift         # 剪贴板 + 模拟 ⌘V + 焦点恢复
 │   ├── SoundPlayer.swift          # 提示音
-│   ├── LiveTextWindow.swift       # 底部悬浮窗（自适应高度 + 字体）
-│   ├── SettingsWindow.swift       # 设置面板
+│   ├── LiveTextWindow.swift       # 底部悬浮窗（自适应高度 + 字体 + 滚动）
+│   ├── SettingsWindow.swift       # Sidebar 设置（通用 / 识别引擎 / 润色）
 │   ├── PlaceholderTextView.swift  # 带 placeholder 的 NSTextView
 │   ├── Config.swift               # JSON 配置读写
 │   └── Strings.swift              # zh/en i18n
 ├── Resources/
 │   ├── Info.plist
 │   ├── Murmur.entitlements
-│   ├── icon_1024.png              # app icon 源图
-│   ├── menubar_banana.png         # 菜单栏 template 图标
+│   ├── icon_1024.png              # 蜂窝六边形 app icon
+│   ├── menubar_banana.png         # 菜单栏 template（历史文件名）
 │   └── start.mp3 / end.mp3
 └── build.sh                       # swiftc + codesign + bundle
 ```
@@ -156,6 +210,7 @@ open build/Murmur.app
 - **`CGEventTap` 监听全局 hotkey** — 唯一能区分左/右 Command 的 API（用 device-dependent flag bit `0x10`）
 - **Esc 选择性消费** — phase ≠ idle 时拦截，其他时候透传，不破坏其他 app 的快捷键
 - **NSVisualEffectView 用 9-slice `maskImage`** — 圆角和窗口阴影完美对齐，不露出矩形外框
+- **STT 后端走 `STTClient` 协议** — 每家 provider 是一个独立文件，加新 provider 只需一个文件 + factory 一行
 
 ---
 
@@ -163,9 +218,9 @@ open build/Murmur.app
 
 Murmur 故意写得很小。最适合扩展的几个点：
 
-- **`SonioxClient.swift`** — 把 Soniox 换成其他实时 STT（AssemblyAI、Deepgram、OpenAI Realtime 等）
-- **`Polisher.swift`** — 加新 LLM 后端。现在有 `claude`（Anthropic）和 `codex`（OpenAI）两个，加 Gemini 或本地 Ollama 大概 30 行代码
-- **`Strings.swift`** — 加更多 UI 语言
+- **新 STT provider** — 新建一个文件实现 `STTClient`，在 `STTClientFactory` 加一个 case。`DeepgramClient.swift` 是最简单的模板。
+- **新润色 LLM** — 在 `Polisher.swift` 里加一个 backend。现在有 `claude`（Anthropic）和 `codex`（OpenAI）两个，加 Gemini 或本地 Ollama 大概 30 行代码。
+- **更多 UI 语言** — 在 `Strings.swift` 里加翻译。
 
 大改动先开 issue，小改直接 PR。
 
@@ -174,7 +229,7 @@ Murmur 故意写得很小。最适合扩展的几个点：
 ## ❓ 已知限制
 
 - ad-hoc codesign 每次 rebuild CDHash 都变，TCC 权限会被撤销 — 开发中正常，发布前用稳定签名身份解决
-- Soniox 实时 API 需要付费账号（有免费额度）
+- 每个 STT provider 需要自己的 API key；**任选一家**即可
 - 仅支持 Apple Silicon（如需 Intel，改 `build.sh` 加 `-target x86_64-apple-macos13.0`）
 
 ---
