@@ -82,11 +82,32 @@
 **前置依赖**
 
 - macOS 13+，Apple Silicon
-- Xcode CommandLine Tools（`xcode-select --install`）
 - 以上任一 provider 的 API key
 - *可选* —— [`claude`](https://claude.com/claude-code) 或 `codex` CLI 已安装并登录（仅润色功能需要；基础录音不需要）
 
-**1 · 构建**
+**方式一 · Homebrew（推荐）**
+
+```bash
+brew tap xwEric/tap
+brew install --cask murmur
+
+# Murmur 是 ad-hoc 签名，第一次启动前先绕过 Gatekeeper：
+xattr -dr com.apple.quarantine "/Applications/Murmur.app"
+open /Applications/Murmur.app
+```
+
+**方式二 · 直接下载**
+
+从 [Releases](https://github.com/xwEric/murmur/releases/latest) 下载 `Murmur-v0.1.0.dmg`，把 Murmur.app 拖到 /Applications，然后绕过 Gatekeeper：
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/Murmur.app"
+open /Applications/Murmur.app
+```
+
+**方式三 · 从源码构建**
+
+需要 Xcode CommandLine Tools（`xcode-select --install`）。
 
 ```bash
 git clone https://github.com/xwEric/murmur

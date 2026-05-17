@@ -82,11 +82,32 @@ For Azure OpenAI, self-hosted vLLM, or any service that implements OpenAI's Real
 **Prerequisites**
 
 - macOS 13+ on Apple Silicon
-- Xcode CommandLine Tools (`xcode-select --install`)
 - An API key from one of the providers above
 - *Optional* — [`claude`](https://claude.com/claude-code) or `codex` CLI installed and logged in (only needed for AI polish; basic dictation works without it)
 
-**1 · Build**
+**Option A · Homebrew (recommended)**
+
+```bash
+brew tap xwEric/tap
+brew install --cask murmur
+
+# Murmur ships ad-hoc signed, so bypass Gatekeeper once:
+xattr -dr com.apple.quarantine "/Applications/Murmur.app"
+open /Applications/Murmur.app
+```
+
+**Option B · Direct download**
+
+Grab `Murmur-v0.1.0.dmg` from [Releases](https://github.com/xwEric/murmur/releases/latest), drag Murmur.app into /Applications, then bypass Gatekeeper:
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/Murmur.app"
+open /Applications/Murmur.app
+```
+
+**Option C · Build from source**
+
+Needs Xcode CommandLine Tools (`xcode-select --install`).
 
 ```bash
 git clone https://github.com/xwEric/murmur
