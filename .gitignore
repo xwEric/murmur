@@ -1,0 +1,22 @@
+# Build output
+build/
+DerivedData/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Xcode
+*.xcuserstate
+*.xcuserdatad/
+xcuserdata/
+*.xcscheme
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# Local config (lives in ~/.claude-profile/dictate/config.json)
+config.json
