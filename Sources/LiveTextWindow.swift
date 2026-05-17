@@ -61,11 +61,24 @@ final class LiveTextWindow {
         effect.material = .hudWindow
         effect.blendingMode = .behindWindow
         effect.state = .active
-        effect.wantsLayer = true
-        effect.layer?.cornerRadius = 14
-        effect.layer?.masksToBounds = true
         effect.autoresizingMask = [.width, .height]
+
+        // Use a 9-slice maskImage (Apple's official pattern) so the rounded corners
+        // are cut crisply AND the window shadow follows the rounded shape.
+        // Layer cornerRadius alone leaves a visible rectangular shadow on macOS.
+        let radius: CGFloat = 14
+        let edge = ceil(radius * 2 + 1)
+        let mask = NSImage(size: NSSize(width: edge, height: edge), flipped: false) { rect in
+            NSColor.black.setFill()
+            NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).fill()
+            return true
+        }
+        mask.capInsets = NSEdgeInsets(top: radius, left: radius, bottom: radius, right: radius)
+        mask.resizingMode = .stretch
+        effect.maskImage = mask
+
         p.contentView = effect
+        p.invalidateShadow()  // force WindowServer to recompute shadow against the new mask
 
         let status = NSTextField(labelWithString: "")
         status.font = .systemFont(ofSize: 11, weight: .semibold)
@@ -271,6 +284,7 @@ final class LiveTextWindow {
         } else {
             panel.setFrame(frame, display: true)
         }
+        panel.invalidateShadow()  // recompute shadow against new rounded shape
     }
 
     /// Drop characters from the head, prefixed with "…", until the result fits in `maxLines` at `font`.
