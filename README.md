@@ -5,7 +5,7 @@
 **Murmur is a minimalist macOS voice-dictation app.** Press **Right ⌘** to speak, press it again, and your transcription is pasted at the cursor — optionally polished by your local Claude or Codex CLI first. A bottom-center overlay shows the live transcript with adaptive sizing.
 
 <p align="center">
-  <img src="Resources/icon_1024.png" alt="Murmur logo" width="160">
+  <video src="https://github.com/xwEric/murmur/raw/main/Resources/demo.mp4" width="720" controls muted playsinline></video>
 </p>
 
 ---
