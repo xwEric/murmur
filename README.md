@@ -14,7 +14,7 @@
 
 1. **No subscription.** Others charge $10–20/month flat. Murmur is pay-as-you-go with your own API key.
 2. **Open source, zero data retention.** MIT-licensed; nothing about you is stored or proxied through anyone else's servers.
-3. **AI polish at no extra cost.** Calls your locally-installed `claude` / `codex` CLI — uses whatever subscription you already have for those, Murmur adds nothing.
+3. **AI polish — your choice of route.** Use your locally-installed `claude` / `codex` CLI (free, reuses your existing subscription, ~5s latency) **or** plug in any OpenAI-compatible API endpoint (1–2s latency, pay per call).
 4. **Pause as many times as you want.** Press Space to pause mid-recording, press again to resume. Works repeatedly, auto-reconnects on socket timeout.
 5. **Real-time transcription.** Words show up in the overlay as you speak.
 
@@ -23,7 +23,7 @@
 ## 🎯 Core features
 
 1. **Real-time speech recognition** — multiple providers: **Soniox**, **Deepgram Nova-3**, **OpenAI Realtime (gpt-4o-mini-transcribe)**, or any **OpenAI-compatible** custom endpoint
-2. **AI polish** — press Alt to clean up filler words via local `claude` / `codex` CLI; custom prompts supported
+2. **AI polish** — press Alt to clean up filler words. Three backends: local `claude` CLI, local `codex` CLI, or **OpenAI-compatible HTTP API** (with automatic model discovery — paste base URL + key, click "Refresh", pick a model). Custom prompts supported.
 3. **Multi-language recognition** — 18 languages selectable in Settings
 4. **Speaker lock** (Soniox only) — locks onto the first speaker; other voices in the background are dropped
 5. **Pause & resume** — pause anytime, resume anytime; previously transcribed text is preserved across socket reconnects

@@ -612,17 +612,31 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, N
         promptScroll.autohidesScrollers = true
         promptScroll.translatesAutoresizingMaskIntoConstraints = false
 
-        polishPromptTextView = PlaceholderTextView(frame: .zero)
+        // Proper NSTextView-in-NSScrollView setup. Without the size / autoresize /
+        // textContainer settings below, the text view renders but clicks don't land
+        // on it, so it looks editable but isn't.
+        polishPromptTextView = PlaceholderTextView(frame: NSRect(x: 0, y: 0, width: 480, height: 180))
         polishPromptTextView.placeholderString = Polisher.defaultSystemPrompt
         polishPromptTextView.font = .systemFont(ofSize: 12)
         polishPromptTextView.textColor = NSColor.labelColor
         polishPromptTextView.backgroundColor = NSColor.textBackgroundColor
+        polishPromptTextView.drawsBackground = true
         polishPromptTextView.isEditable = true
+        polishPromptTextView.isSelectable = true
         polishPromptTextView.isRichText = false
         polishPromptTextView.isAutomaticQuoteSubstitutionEnabled = false
         polishPromptTextView.isAutomaticDashSubstitutionEnabled = false
         polishPromptTextView.allowsUndo = true
         polishPromptTextView.textContainerInset = NSSize(width: 4, height: 4)
+        polishPromptTextView.isHorizontallyResizable = false
+        polishPromptTextView.isVerticallyResizable = true
+        polishPromptTextView.autoresizingMask = .width
+        polishPromptTextView.minSize = NSSize(width: 0, height: 0)
+        polishPromptTextView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude,
+                                              height: CGFloat.greatestFiniteMagnitude)
+        polishPromptTextView.textContainer?.widthTracksTextView = true
+        polishPromptTextView.textContainer?.containerSize = NSSize(width: 480,
+                                                                   height: CGFloat.greatestFiniteMagnitude)
         promptScroll.documentView = polishPromptTextView
 
         NSLayoutConstraint.activate([
