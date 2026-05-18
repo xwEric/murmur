@@ -18,6 +18,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSLog("Murmur: applicationDidFinishLaunching")
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+
+        // Read UI language from config BEFORE building the menu (so labels render correctly).
+        // Missing config or load error → English default.
+        if let cfg = try? Config.load() {
+            Strings.applyConfigLanguage(cfg.uiLanguage)
+        }
+
         buildMenu()
         updateMenuBarIcon()
 
@@ -142,10 +149,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         state.resetSession()
 
         // Validate config (API keys must be present for the selected provider).
+        // Fast sync check — no shell forks, no HTTP. The actual STT connect happens below.
         if let err = config.validate() {
             NSLog("Murmur: config invalid — \(err)")
-            showAlert(title: Strings.alertConfigMissing, body: err, style: .warning)
-            openSettings()
+            showSettingsAlert(title: Strings.alertSTTNeedSetup,
+                              body: Strings.alertSTTNeedSetupBody + "\n\n" + err)
             state.set(.idle)
             return
         }
@@ -323,6 +331,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             liveWindow.setMode(.reviewing(isPolished: false))
             return
         }
+
+        // Fast sync pre-flight: instant config-only check (no shell fork, no HTTP).
+        // The real polish call below runs on a background queue so failures from the
+        // backend itself surface async via the failure branch.
+        if let err = Polisher.validateConfig(backend: config.polishBackend,
+                                              apiBaseUrl: config.polishApiBaseUrl,
+                                              apiKey: config.polishApiKey) {
+            NSLog("Murmur: polish pre-flight failed — \(err)")
+            // Fall through to reviewing-original so the user can still commit raw text.
+            state.displayingPolished = false
+            state.set(.reviewing)
+            liveWindow.setText(state.raw)
+            liveWindow.setMode(.reviewing(isPolished: false))
+            showSettingsAlert(title: Strings.alertPolishError,
+                              body: Strings.alertPolishErrorBody + "\n\n" + err)
+            return
+        }
+
         NSLog("Murmur: polish via \(config.polishBackend)/\(config.polishModel) on \(state.raw.count) chars")
         state.set(.polishing)
         liveWindow.setMode(.polishing)
@@ -347,11 +373,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 NSLog("Murmur: polish failure: \(err.localizedDescription)")
                 self.state.displayingPolished = false
                 self.state.set(.reviewing)
-                self.liveWindow.setMode(.error(err.localizedDescription))
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
-                    self.liveWindow.setText(self.state.raw)
-                    self.liveWindow.setMode(.reviewing(isPolished: false))
-                }
+                // Revert overlay to raw text so user can still commit.
+                self.liveWindow.setText(self.state.raw)
+                self.liveWindow.setMode(.reviewing(isPolished: false))
+                self.showSettingsAlert(title: Strings.alertPolishError,
+                                       body: Strings.alertPolishErrorBody + "\n\n" + err.localizedDescription)
             }
         }
     }
@@ -459,8 +485,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func openSettings() {
         if settingsWindow == nil {
             settingsWindow = SettingsWindow { [weak self] newCfg in
-                self?.config = newCfg
-                NSLog("Murmur: config reloaded after settings save")
+                guard let self = self else { return }
+                let langChanged = (Strings.isZH != (newCfg.uiLanguage == "zh"))
+                self.config = newCfg
+                Strings.applyConfigLanguage(newCfg.uiLanguage)
+                if langChanged { self.buildMenu() }
+                NSLog("Murmur: config reloaded after settings save (langChanged=\(langChanged))")
             }
         }
         settingsWindow?.show()
@@ -481,5 +511,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         alert.informativeText = body
         alert.alertStyle = style
         alert.runModal()
+    }
+
+    /// Modal alert with [Open Settings] [Later] buttons. Opens Settings when the user clicks it.
+    /// Used for both STT-not-configured (pre-flight) and polish-failed (post-flight) cases.
+    private func showSettingsAlert(title: String, body: String, style: NSAlert.Style = .warning) {
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = body
+        alert.alertStyle = style
+        alert.addButton(withTitle: Strings.btnOpenSettings)
+        alert.addButton(withTitle: Strings.btnLater)
+        let response = alert.runModal()
+        if response == .alertFirstButtonReturn {
+            openSettings()
+        }
     }
 }

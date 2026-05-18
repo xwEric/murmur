@@ -7,7 +7,47 @@ import Foundation
 ///   - "codex":            `codex exec --skip-git-repo-check --sandbox read-only -m MODEL "SYS\n\nTEXT"`
 enum Polisher {
     /// Default polish instruction — kept short on purpose. Users override via Settings.
-    static let defaultSystemPrompt = "Polish this voice-input transcript: remove filler words, fix obvious mis-recognitions, preserve the original language and meaning. Output the result as ONE single continuous line — NO line breaks, no newlines, no paragraph breaks. Reply with the polished text only — no quotes, no markdown, no explanation."
+    static let defaultSystemPrompt = "Polish this voice-input transcript: remove filler words, fix obvious mis-recognitions, preserve the original language and meaning. When the speaker self-corrects mid-sentence (e.g. \"let's make it 2 hours... no wait, change to 5 hours\"), keep ONLY the final corrected version (\"5 hours\") and drop the abandoned attempt and the correction phrase itself. Output the result as ONE single continuous line — NO line breaks, no newlines, no paragraph breaks. Reply with the polished text only — no quotes, no markdown, no explanation."
+
+    /// Fast, synchronous, instant pre-flight check for the polish backend.
+    /// - CLI backends: just check whether the binary exists at one of the well-known fixed paths
+    ///   (NO shell fork — we don't want any blocking work on the Alt-press path).
+    /// - openai_api: non-empty baseUrl + apiKey.
+    /// Returns nil if usable, otherwise a human-readable reason.
+    static func validateConfig(backend: String, apiBaseUrl: String, apiKey: String) -> String? {
+        let trimmedUrl = apiBaseUrl.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        switch backend {
+        case "openai_api":
+            if trimmedUrl.isEmpty { return "Polish API Base URL is empty" }
+            if trimmedKey.isEmpty { return "Polish API Key is empty" }
+            return nil
+        case "codex":
+            return fastFindBinary("codex") == nil
+                ? "codex CLI not found (install codex or switch backend in Settings)"
+                : nil
+        default: // "claude" or unknown → treat as claude CLI
+            return fastFindBinary("claude") == nil
+                ? "claude CLI not found (install claude or switch backend in Settings)"
+                : nil
+        }
+    }
+
+    /// Fixed-path lookup, no shell fork. Intentionally cheaper than `findBinary`.
+    private static func fastFindBinary(_ name: String) -> String? {
+        let home = NSHomeDirectory()
+        let candidates = [
+            "\(home)/.local/bin/\(name)",
+            "/opt/homebrew/bin/\(name)",
+            "/usr/local/bin/\(name)",
+            "\(home)/.bun/bin/\(name)",
+            "\(home)/.npm-global/bin/\(name)",
+            "/usr/bin/\(name)",
+        ]
+        let fm = FileManager.default
+        for p in candidates where fm.isExecutableFile(atPath: p) { return p }
+        return nil
+    }
 
     static func polish(_ text: String,
                        backend: String,

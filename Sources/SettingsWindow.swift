@@ -62,6 +62,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, N
     private var currentSection: SettingsSection = .general
 
     // General section
+    private var uiLanguagePopup: NSPopUpButton!
     private var langCheckboxes: [String: NSButton] = [:]
     private var speakerLockCheckbox: NSButton!
 
@@ -117,7 +118,8 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, N
             polishPrompt: "",
             speakerLock: false,
             polishApiBaseUrl: Config.defaultPolishApiBaseUrl,
-            polishApiKey: ""
+            polishApiKey: "",
+            uiLanguage: Config.defaultUILanguage
         )
         populate(from: current)
 
@@ -128,6 +130,11 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, N
 
     private func populate(from c: Config) {
         // General
+        switch c.uiLanguage {
+        case "zh": uiLanguagePopup.selectItem(withTitle: Strings.settingsUILangChinese)
+        case "en": uiLanguagePopup.selectItem(withTitle: Strings.settingsUILangEnglish)
+        default:   uiLanguagePopup.selectItem(withTitle: Strings.settingsUILangAuto)
+        }
         let selected = Set(c.languageHints)
         for (code, box) in langCheckboxes { box.state = selected.contains(code) ? .on : .off }
         speakerLockCheckbox.state = c.speakerLock ? .on : .off
@@ -273,7 +280,18 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, N
         let stack = makeSectionStack(title: Strings.settingsSecGeneral,
                                      subtitle: Strings.settingsSecGeneralHint)
 
-        // Language picker
+        // UI language (Murmur's own menu/settings labels)
+        stack.addArrangedSubview(makeFieldLabel(Strings.settingsUILanguage,
+                                                 help: Strings.settingsUILanguageHelp))
+        uiLanguagePopup = NSPopUpButton(frame: .zero, pullsDown: false)
+        uiLanguagePopup.addItem(withTitle: Strings.settingsUILangAuto)
+        uiLanguagePopup.addItem(withTitle: Strings.settingsUILangEnglish)
+        uiLanguagePopup.addItem(withTitle: Strings.settingsUILangChinese)
+        stack.addArrangedSubview(uiLanguagePopup)
+
+        stack.addArrangedSubview(makeDivider())
+
+        // Recognition language hints
         stack.addArrangedSubview(makeFieldLabel(Strings.settingsLangHints,
                                                  help: Strings.settingsLangHintsHelp))
         stack.addArrangedSubview(buildLanguageGrid())
@@ -961,7 +979,14 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, N
             polishPrompt: polishPrompt,
             speakerLock: speakerLockCheckbox.state == .on,
             polishApiBaseUrl: polishApiBaseUrl.isEmpty ? Config.defaultPolishApiBaseUrl : polishApiBaseUrl,
-            polishApiKey: polishApiKey
+            polishApiKey: polishApiKey,
+            uiLanguage: {
+                switch uiLanguagePopup.titleOfSelectedItem {
+                case Strings.settingsUILangChinese: return "zh"
+                case Strings.settingsUILangEnglish: return "en"
+                default:                            return "auto"
+                }
+            }()
         )
         do {
             try cfg.save()

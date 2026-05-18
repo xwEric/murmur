@@ -1,13 +1,25 @@
 import Foundation
 
-/// Tiny localization helper — picks zh-CN strings if the user's preferred language is Chinese,
-/// otherwise English. We don't use NSLocalizedString because it requires a .lproj bundle setup
+/// Tiny localization helper — driven by Config.uiLanguage. Defaults to English.
+/// We don't use NSLocalizedString because it requires a .lproj bundle setup
 /// that's awkward for a single-binary swiftc build.
 enum Strings {
-    static let isZH: Bool = {
+    /// Mutated by `applyConfigLanguage` at app launch and on Settings save.
+    static var isZH: Bool = systemPrefersChinese()
+
+    /// `code` may be "auto" | "en" | "zh". "auto" → follow system locale.
+    static func applyConfigLanguage(_ code: String) {
+        switch code.lowercased() {
+        case "zh": isZH = true
+        case "en": isZH = false
+        default:   isZH = systemPrefersChinese()
+        }
+    }
+
+    private static func systemPrefersChinese() -> Bool {
         let lang = Locale.preferredLanguages.first?.lowercased() ?? "en"
         return lang.hasPrefix("zh")
-    }()
+    }
 
     private static func L(_ zh: String, _ en: String) -> String { isZH ? zh : en }
 
@@ -55,7 +67,14 @@ enum Strings {
     static var settingsSecGeneral:  String { L("通用",     "General") }
     static var settingsSecProvider: String { L("识别引擎", "STT Provider") }
     static var settingsSecPolish:   String { L("润色",     "Polish") }
-    static var settingsSecGeneralHint:  String { L("识别语言与说话人设置", "Language hints and speaker behavior.") }
+    static var settingsSecGeneralHint:  String { L("界面语言、识别语言与说话人设置", "Interface language, recognition language hints, and speaker behavior.") }
+
+    // UI language
+    static var settingsUILanguage: String { L("界面语言", "Interface Language") }
+    static var settingsUILanguageHelp: String { L("切换 Murmur 自身的菜单和设置语言。默认跟随系统语言；重启后所有界面完全刷新。", "Switches Murmur's own menu and Settings labels. Defaults to system language; restart for everything to refresh.") }
+    static var settingsUILangAuto: String { L("跟随系统", "Auto (System)") }
+    static var settingsUILangEnglish: String { L("English", "English") }
+    static var settingsUILangChinese: String { L("中文", "中文") }
     static var settingsSecProviderHint: String { L("选择实时语音识别服务，并填写对应 API key。", "Choose a real-time speech-to-text service and enter its API key.") }
     static var settingsSecPolishHint:   String { L("识别完成后用 LLM 润色文字（可选）。", "Optionally polish the transcript with an LLM after recognition.") }
 
@@ -143,6 +162,20 @@ enum Strings {
     static var settingsCancel: String { L("取消", "Cancel") }
     static var settingsSaveOK: String { L("已保存", "Saved") }
     static var settingsSaveOKBody: String { L("配置已写入 ~/.claude-profile/dictate/config.json", "Config written to ~/.claude-profile/dictate/config.json") }
+
+    // STT pre-flight (start recording without API key)
+    static var alertSTTNeedSetup: String { L("尚未配置识别服务", "Speech-to-Text Not Configured") }
+    static var alertSTTNeedSetupBody: String {
+        L("Murmur 需要至少一个 STT 服务的 API key 才能开始录音。请在 Settings → STT Provider 中填写你选用的 provider 的 key，然后再试一次。",
+          "Murmur needs an API key for at least one Speech-to-Text provider before it can record. Open Settings → STT Provider, paste your provider's API key, and try again.")
+    }
+
+    // Polish pre-flight + failure dialog
+    static var alertPolishError: String { L("润色无法完成", "Polish Failed") }
+    static var alertPolishErrorBody: String {
+        L("当前选择的润色后端不可用。请打开 Settings → Polish 检查 CLI 是否已安装、API key 是否填写正确，或切换到另一种润色方式。",
+          "The selected polish backend isn't working. Open Settings → Polish and check that the CLI is installed and logged in, or that the API key is correct — or switch to a different polish method.")
+    }
 
     // Permission alerts
     static var alertConfigMissing: String { L("配置缺失", "Config Missing") }

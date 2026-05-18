@@ -32,6 +32,9 @@ struct Config {
     var polishApiBaseUrl: String   // e.g. "https://api.openai.com/v1"
     var polishApiKey: String
 
+    // UI language for Murmur's own menus/settings: "en" | "zh". Default English.
+    var uiLanguage: String
+
     static let configURL: URL = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent(".claude-profile/dictate/config.json")
 
@@ -47,6 +50,7 @@ struct Config {
     static let defaultPolishModelCodex = "gpt-5-codex"
     static let defaultPolishApiBaseUrl = "https://api.openai.com/v1"
     static let defaultPolishApiModel = "gpt-4o-mini"
+    static let defaultUILanguage = "auto"
 
     static func load() throws -> Config {
         // If the config file doesn't exist yet, return an empty default config.
@@ -74,7 +78,8 @@ struct Config {
                 polishPrompt: "",
                 speakerLock: false,
                 polishApiBaseUrl: defaultPolishApiBaseUrl,
-                polishApiKey: ""
+                polishApiKey: "",
+                uiLanguage: defaultUILanguage
             )
         }
         let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
@@ -104,7 +109,8 @@ struct Config {
             polishPrompt: (json["polish_prompt"] as? String) ?? "",
             speakerLock: (json["speaker_lock"] as? Bool) ?? false,
             polishApiBaseUrl: (json["polish_api_base_url"] as? String) ?? defaultPolishApiBaseUrl,
-            polishApiKey: (json["polish_api_key"] as? String) ?? ""
+            polishApiKey: (json["polish_api_key"] as? String) ?? "",
+            uiLanguage: (json["ui_language"] as? String) ?? defaultUILanguage
         )
         return cfg
     }
@@ -130,6 +136,7 @@ struct Config {
             "speaker_lock": speakerLock,
             "polish_api_base_url": polishApiBaseUrl,
             "polish_api_key": polishApiKey,
+            "ui_language": uiLanguage,
         ]
         let data = try JSONSerialization.data(withJSONObject: dict,
                                               options: [.prettyPrinted, .sortedKeys])
