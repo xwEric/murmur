@@ -10,6 +10,71 @@
 
 ---
 
+## ⚡ 快速安装
+
+**前置依赖**
+
+- macOS 13+，Apple Silicon
+- 以下任一 provider 的 API key（Soniox / Deepgram / OpenAI / OpenAI 兼容）
+- *可选* —— [`claude`](https://claude.com/claude-code) 或 `codex` CLI 已安装并登录（仅 CLI 润色路径需要；HTTP 润色和基础录音不需要）
+
+**方式一 · Homebrew（推荐）**
+
+```bash
+brew tap xwEric/tap
+brew install --cask murmur
+
+# Murmur 是 ad-hoc 签名，第一次启动前先绕过 Gatekeeper：
+xattr -dr com.apple.quarantine "/Applications/Murmur.app"
+open /Applications/Murmur.app
+```
+
+**方式二 · 直接下载**
+
+从 [Releases](https://github.com/xwEric/murmur/releases/latest) 下载 `Murmur-v0.1.1.dmg`，把 Murmur.app 拖到 /Applications，然后绕过 Gatekeeper：
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/Murmur.app"
+open /Applications/Murmur.app
+```
+
+**方式三 · 从源码构建**
+
+需要 Xcode CommandLine Tools（`xcode-select --install`）。
+
+```bash
+git clone https://github.com/xwEric/murmur
+cd murmur
+./build.sh                  # swiftc + ad-hoc codesign + bundle（约 3 秒）
+open build/Murmur.app
+```
+
+**首次运行设置**（一次性）
+
+启动后菜单栏会出现六边形小图标。第一次运行时：
+
+1. **麦克风权限** —— 系统弹窗，点 **允许**
+2. **辅助功能权限** —— 菜单栏图标 → *"打开辅助功能设置"* → 把 `Murmur.app` 加入列表并打开开关
+3. **退出并重新启动 Murmur**（macOS 会重新校验签名，权限需要重启才生效）
+4. 打开设置（菜单栏图标 → *"设置…"*）→ 识别引擎 → 粘贴你的 API key
+
+**开始使用**
+
+把光标放进系统中任意输入框（备忘录、Slack、浏览器、终端 —— 哪里都行），然后：
+
+- 按 **Right ⌘** → 说话 → 再按 **Right ⌘** → 文字粘到光标位置
+- 按 **Right ⌘** → 说话 → 按 **Alt** → AI 润色 → 按 **Right ⌘** 插入润色版
+- 录音中按 **Space** 暂停；再按 **Space** 继续
+- 任意状态按 **Esc** 取消，不插入任何内容
+
+**注意事项**
+
+- 如果你重新编译过源码，ad-hoc 签名的 binary hash 会变，**macOS 会撤销权限** —— 需要重新到辅助功能里把 Murmur 加上、麦克风再授权一次。停止改代码后就不再有这个问题。
+- 第一次录音的 WebSocket 启动会多几百毫秒，之后都是即时的。
+- CLI 润色需要 `claude` 或 `codex` CLI 提前登录好，Murmur 自己不管 CLI 的登录流程。（用 HTTP 润色后端则不需要。）
+
+---
+
 ## ✨ 为什么选 Murmur
 
 1. **没有月费。** 别人动辄每月 $10–20，Murmur 完全按需付费 —— 你用自己的 API key，按用量计费。
@@ -74,71 +139,6 @@
 2. **Base URL**：`wss://your-host/v1/realtime?intent=transcription`（按你的服务商）
 3. **API Key**：服务商在 `Authorization: Bearer` header 里期望的值
 4. **模型名称**：会作为 `transcription_session.update` 的 model 字段发出去
-
----
-
-## ⚡ 快速安装
-
-**前置依赖**
-
-- macOS 13+，Apple Silicon
-- 以上任一 provider 的 API key
-- *可选* —— [`claude`](https://claude.com/claude-code) 或 `codex` CLI 已安装并登录（仅润色功能需要；基础录音不需要）
-
-**方式一 · Homebrew（推荐）**
-
-```bash
-brew tap xwEric/tap
-brew install --cask murmur
-
-# Murmur 是 ad-hoc 签名，第一次启动前先绕过 Gatekeeper：
-xattr -dr com.apple.quarantine "/Applications/Murmur.app"
-open /Applications/Murmur.app
-```
-
-**方式二 · 直接下载**
-
-从 [Releases](https://github.com/xwEric/murmur/releases/latest) 下载 `Murmur-v0.1.0.dmg`，把 Murmur.app 拖到 /Applications，然后绕过 Gatekeeper：
-
-```bash
-xattr -dr com.apple.quarantine "/Applications/Murmur.app"
-open /Applications/Murmur.app
-```
-
-**方式三 · 从源码构建**
-
-需要 Xcode CommandLine Tools（`xcode-select --install`）。
-
-```bash
-git clone https://github.com/xwEric/murmur
-cd murmur
-./build.sh                  # swiftc + ad-hoc codesign + bundle（约 3 秒）
-open build/Murmur.app
-```
-
-**2 · 首次运行设置**（一次性）
-
-启动后菜单栏会出现六边形小图标。第一次运行时：
-
-1. **麦克风权限** —— 系统弹窗，点 **允许**
-2. **辅助功能权限** —— 菜单栏图标 → *"打开辅助功能设置"* → 把 `Murmur.app` 加入列表并打开开关
-3. **退出并重新启动 Murmur**（macOS 会重新校验签名，权限需要重启才生效）
-4. 打开设置（菜单栏图标 → *"设置…"*）→ 识别引擎 → 粘贴你的 API key
-
-**3 · 开始使用**
-
-把光标放进系统中任意输入框（备忘录、Slack、浏览器、终端 —— 哪里都行），然后：
-
-- 按 **Right ⌘** → 说话 → 再按 **Right ⌘** → 文字粘到光标位置
-- 按 **Right ⌘** → 说话 → 按 **Alt** → AI 润色 → 按 **Right ⌘** 插入润色版
-- 录音中按 **Space** 暂停；再按 **Space** 继续
-- 任意状态按 **Esc** 取消，不插入任何内容
-
-**注意事项**
-
-- 如果你重新编译过源码，ad-hoc 签名的 binary hash 会变，**macOS 会撤销权限** —— 需要重新到辅助功能里把 Murmur 加上、麦克风再授权一次。停止改代码后就不再有这个问题。
-- 第一次录音的 WebSocket 启动会多几百毫秒，之后都是即时的。
-- AI 润色需要 `claude` 或 `codex` CLI 提前登录好，Murmur 自己不管 CLI 的登录流程。
 
 ---
 

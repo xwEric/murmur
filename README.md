@@ -10,6 +10,71 @@
 
 ---
 
+## ⚡ Quick install
+
+**Prerequisites**
+
+- macOS 13+ on Apple Silicon
+- An API key from one of the STT providers below (Soniox / Deepgram / OpenAI / OpenAI-compatible)
+- *Optional* — [`claude`](https://claude.com/claude-code) or `codex` CLI installed and logged in (only needed for the CLI-based polish path; HTTP-based polish and basic dictation work without it)
+
+**Option A · Homebrew (recommended)**
+
+```bash
+brew tap xwEric/tap
+brew install --cask murmur
+
+# Murmur ships ad-hoc signed, so bypass Gatekeeper once:
+xattr -dr com.apple.quarantine "/Applications/Murmur.app"
+open /Applications/Murmur.app
+```
+
+**Option B · Direct download**
+
+Grab `Murmur-v0.1.1.dmg` from [Releases](https://github.com/xwEric/murmur/releases/latest), drag Murmur.app into /Applications, then bypass Gatekeeper:
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/Murmur.app"
+open /Applications/Murmur.app
+```
+
+**Option C · Build from source**
+
+Needs Xcode CommandLine Tools (`xcode-select --install`).
+
+```bash
+git clone https://github.com/xwEric/murmur
+cd murmur
+./build.sh                  # swiftc + ad-hoc codesign + bundle (~3 seconds)
+open build/Murmur.app
+```
+
+**First-run setup** (one-time)
+
+A small hexagonal icon appears in your menu bar. On first launch:
+
+1. **Microphone permission** — a system dialog pops up; click **Allow**
+2. **Accessibility permission** — menu bar icon → *"Open Accessibility Settings"* → add `Murmur.app` and toggle the switch on
+3. **Quit and relaunch Murmur** (macOS re-validates the signature; permissions only apply after a fresh launch)
+4. Open Settings (menu bar icon → *"Settings…"*) → STT Provider → paste your API key
+
+**Use it**
+
+Click any text field anywhere on your system (Notes, Slack, browser, terminal — anywhere), then:
+
+- Press **Right ⌘** → speak → press **Right ⌘** again → text appears at cursor
+- Press **Right ⌘** → speak → press **Alt** → AI polishes → press **Right ⌘** to insert polished
+- Press **Space** mid-recording to pause; press **Space** again to resume
+- Press **Esc** anytime to cancel without inserting
+
+**Heads-up**
+
+- If you rebuild from source, ad-hoc codesign changes the binary hash and **macOS will revoke permissions** — you'll need to re-add Murmur to Accessibility & re-grant Microphone after each rebuild. Not a problem once you stop touching the code.
+- The very first recording may take an extra ~500 ms to spin up the WebSocket; subsequent ones are instant.
+- CLI polish requires your `claude` or `codex` CLI to already be logged in — Murmur doesn't handle that login flow. (Not needed if you use the HTTP polish backend.)
+
+---
+
 ## ✨ Why Murmur
 
 1. **No subscription.** Others charge $10–20/month flat. Murmur is pay-as-you-go with your own API key.
@@ -74,71 +139,6 @@ For Azure OpenAI, self-hosted vLLM, or any service that implements OpenAI's Real
 2. **Base URL**: `wss://your-host/v1/realtime?intent=transcription` (provider-specific)
 3. **API Key**: whatever your endpoint expects in the `Authorization: Bearer` header
 4. **Model name**: passed through in `transcription_session.update`
-
----
-
-## ⚡ Quick install
-
-**Prerequisites**
-
-- macOS 13+ on Apple Silicon
-- An API key from one of the providers above
-- *Optional* — [`claude`](https://claude.com/claude-code) or `codex` CLI installed and logged in (only needed for AI polish; basic dictation works without it)
-
-**Option A · Homebrew (recommended)**
-
-```bash
-brew tap xwEric/tap
-brew install --cask murmur
-
-# Murmur ships ad-hoc signed, so bypass Gatekeeper once:
-xattr -dr com.apple.quarantine "/Applications/Murmur.app"
-open /Applications/Murmur.app
-```
-
-**Option B · Direct download**
-
-Grab `Murmur-v0.1.0.dmg` from [Releases](https://github.com/xwEric/murmur/releases/latest), drag Murmur.app into /Applications, then bypass Gatekeeper:
-
-```bash
-xattr -dr com.apple.quarantine "/Applications/Murmur.app"
-open /Applications/Murmur.app
-```
-
-**Option C · Build from source**
-
-Needs Xcode CommandLine Tools (`xcode-select --install`).
-
-```bash
-git clone https://github.com/xwEric/murmur
-cd murmur
-./build.sh                  # swiftc + ad-hoc codesign + bundle (~3 seconds)
-open build/Murmur.app
-```
-
-**2 · First-run setup** (one-time)
-
-A small hexagonal icon appears in your menu bar. On first launch:
-
-1. **Microphone permission** — a system dialog pops up; click **Allow**
-2. **Accessibility permission** — menu bar icon → *"Open Accessibility Settings"* → add `Murmur.app` and toggle the switch on
-3. **Quit and relaunch Murmur** (macOS re-validates the signature; permissions only apply after a fresh launch)
-4. Open Settings (menu bar icon → *"Settings…"*) → STT Provider → paste your API key
-
-**3 · Use it**
-
-Click any text field anywhere on your system (Notes, Slack, browser, terminal — anywhere), then:
-
-- Press **Right ⌘** → speak → press **Right ⌘** again → text appears at cursor
-- Press **Right ⌘** → speak → press **Alt** → AI polishes → press **Right ⌘** to insert polished
-- Press **Space** mid-recording to pause; press **Space** again to resume
-- Press **Esc** anytime to cancel without inserting
-
-**Heads-up**
-
-- If you rebuild from source, ad-hoc codesign changes the binary hash and **macOS will revoke permissions** — you'll need to re-add Murmur to Accessibility & re-grant Microphone after each rebuild. Not a problem once you stop touching the code.
-- The very first recording may take an extra ~500 ms to spin up the WebSocket; subsequent ones are instant.
-- AI polish requires your `claude` or `codex` CLI to already be logged in — Murmur doesn't handle that login flow.
 
 ---
 
