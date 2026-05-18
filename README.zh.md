@@ -4,9 +4,7 @@
 
 **Murmur 是一个极简的 macOS 语音输入 app。** 按一下 **Right ⌘** 开始说话，再按一下，转写出的文字就粘到你光标所在的位置 —— 还可以选择让本机的 `claude` 或 `codex` CLI 先帮你润色一下。底部悬浮窗显示实时识别，自动适应字数。
 
-<p align="center">
-  <video src="https://github.com/xwEric/murmur/raw/main/Resources/demo.mp4" width="720" controls muted playsinline></video>
-</p>
+https://github.com/user-attachments/assets/e4b9483f-68cf-45d5-9f37-596fe46d9327
 
 ---
 
