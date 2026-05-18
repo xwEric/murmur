@@ -83,6 +83,13 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, N
     private var backendPopup: NSPopUpButton!
     private var polishModelPopup: NSPopUpButton!
     private var polishPromptTextView: PlaceholderTextView!
+    // Polish: openai_api specific
+    private var polishApiBaseUrlField: NSTextField!
+    private var polishApiKeyField: NSSecureTextField!
+    private var refreshModelsButton: NSButton!
+    private var refreshModelsStatus: NSTextField!
+    private var apiPanelStack: NSStackView!
+    private var fetchedApiModels: [String] = []
 
     init(onSaved: @escaping (Config) -> Void) {
         self.onSaved = onSaved
@@ -108,7 +115,9 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, N
             polishBackend: Config.defaultPolishBackend,
             polishModel: Config.defaultPolishModelClaude,
             polishPrompt: "",
-            speakerLock: false
+            speakerLock: false,
+            polishApiBaseUrl: Config.defaultPolishApiBaseUrl,
+            polishApiKey: ""
         )
         populate(from: current)
 
@@ -145,7 +154,13 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, N
         customModelField.stringValue = c.customModel
 
         // Polish
-        backendPopup.selectItem(withTitle: c.polishBackend)
+        polishApiBaseUrlField.stringValue = c.polishApiBaseUrl
+        polishApiKeyField.stringValue = c.polishApiKey
+        setPolishBackendPopup(toKey: c.polishBackend)
+        // Seed the dropdown with the saved model so it's available even before refresh.
+        if c.polishBackend == "openai_api" && !c.polishModel.isEmpty {
+            fetchedApiModels = [c.polishModel]
+        }
         rebuildPolishModelOptions(currentModel: c.polishModel)
         polishPromptTextView.string = c.polishPrompt
 
@@ -531,13 +546,53 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, N
                                   subtitle: Strings.settingsSecPolishHint)
 
         backendPopup = NSPopUpButton()
-        backendPopup.addItems(withTitles: ["claude", "codex"])
+        // Display titles → internal keys: "claude" / "codex" / "openai_api"
+        backendPopup.addItems(withTitles: [
+            "claude (CLI)",
+            "codex (CLI)",
+            Strings.settingsPolishBackendApi,
+        ])
         backendPopup.target = self
         backendPopup.action = #selector(backendChanged)
         backendPopup.translatesAutoresizingMaskIntoConstraints = false
         s.addArrangedSubview(makeFieldRow(label: Strings.settingsPolishBackend,
                                           help: nil,
                                           field: backendPopup))
+
+        // API panel (shown only when openai_api selected)
+        apiPanelStack = NSStackView()
+        apiPanelStack.orientation = .vertical
+        apiPanelStack.alignment = .leading
+        apiPanelStack.spacing = 10
+        apiPanelStack.translatesAutoresizingMaskIntoConstraints = false
+
+        polishApiBaseUrlField = NSTextField()
+        polishApiBaseUrlField.placeholderString = "https://api.openai.com/v1"
+        polishApiBaseUrlField.translatesAutoresizingMaskIntoConstraints = false
+        apiPanelStack.addArrangedSubview(makeFieldRow(label: Strings.settingsPolishApiBaseUrl,
+                                                      help: Strings.settingsPolishApiBaseUrlHelp,
+                                                      field: polishApiBaseUrlField))
+
+        polishApiKeyField = NSSecureTextField()
+        polishApiKeyField.placeholderString = "sk-..."
+        polishApiKeyField.translatesAutoresizingMaskIntoConstraints = false
+        apiPanelStack.addArrangedSubview(makeFieldRow(label: Strings.settingsPolishApiKey,
+                                                      help: Strings.settingsPolishApiKeyHelp,
+                                                      field: polishApiKeyField))
+
+        refreshModelsButton = NSButton(title: Strings.settingsRefreshModels,
+                                        target: self, action: #selector(refreshModels))
+        refreshModelsButton.bezelStyle = .rounded
+        refreshModelsStatus = NSTextField(labelWithString: "")
+        refreshModelsStatus.font = .systemFont(ofSize: 11)
+        refreshModelsStatus.textColor = NSColor.secondaryLabelColor
+        let refreshRow = NSStackView(views: [refreshModelsButton, refreshModelsStatus])
+        refreshRow.orientation = .horizontal
+        refreshRow.spacing = 10
+        refreshRow.alignment = .firstBaseline
+        apiPanelStack.addArrangedSubview(refreshRow)
+
+        s.addArrangedSubview(apiPanelStack)
 
         polishModelPopup = NSPopUpButton()
         polishModelPopup.translatesAutoresizingMaskIntoConstraints = false
@@ -579,25 +634,87 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, N
         return wrapInScroll(s)
     }
 
+    /// Maps user-facing backend popup display text → internal config key.
+    private func currentPolishBackendKey() -> String {
+        switch backendPopup.titleOfSelectedItem ?? "" {
+        case "codex (CLI)": return "codex"
+        case Strings.settingsPolishBackendApi: return "openai_api"
+        default: return "claude"
+        }
+    }
+
+    private func setPolishBackendPopup(toKey key: String) {
+        switch key {
+        case "codex":      backendPopup.selectItem(withTitle: "codex (CLI)")
+        case "openai_api": backendPopup.selectItem(withTitle: Strings.settingsPolishBackendApi)
+        default:           backendPopup.selectItem(withTitle: "claude (CLI)")
+        }
+    }
+
     private func rebuildPolishModelOptions(currentModel: String?) {
-        let backend = backendPopup.titleOfSelectedItem ?? "claude"
-        let options = PolishModels[backend] ?? ["sonnet"]
+        let backend = currentPolishBackendKey()
+        let options: [String]
+        if backend == "openai_api" {
+            // Use fetched models if available, else just the current saved one as placeholder.
+            options = fetchedApiModels.isEmpty
+                ? (currentModel.map { [$0] } ?? [Config.defaultPolishApiModel])
+                : fetchedApiModels
+        } else {
+            options = PolishModels[backend] ?? ["sonnet"]
+        }
         polishModelPopup.removeAllItems()
         polishModelPopup.addItems(withTitles: options)
         if let m = currentModel, options.contains(m) {
             polishModelPopup.selectItem(withTitle: m)
         } else {
-            let def = backend == "codex" ? Config.defaultPolishModelCodex : Config.defaultPolishModelClaude
+            let def: String
+            switch backend {
+            case "codex":      def = Config.defaultPolishModelCodex
+            case "openai_api": def = Config.defaultPolishApiModel
+            default:           def = Config.defaultPolishModelClaude
+            }
             if options.contains(def) {
                 polishModelPopup.selectItem(withTitle: def)
             } else {
                 polishModelPopup.selectItem(at: 0)
             }
         }
+
+        // Show/hide the API config panel based on backend
+        apiPanelStack.isHidden = (backend != "openai_api")
     }
 
     @objc private func backendChanged() {
+        // Keep the currently typed key intact when switching backends so user doesn't re-type
         rebuildPolishModelOptions(currentModel: nil)
+    }
+
+    @objc private func refreshModels() {
+        let baseUrl = polishApiBaseUrlField.stringValue.trimmingCharacters(in: .whitespaces)
+        let apiKey = polishApiKeyField.stringValue.trimmingCharacters(in: .whitespaces)
+        guard !baseUrl.isEmpty else {
+            refreshModelsStatus.stringValue = "Base URL is empty"
+            refreshModelsStatus.textColor = NSColor.systemRed
+            return
+        }
+        refreshModelsButton.isEnabled = false
+        refreshModelsStatus.stringValue = Strings.settingsFetchingModels
+        refreshModelsStatus.textColor = NSColor.secondaryLabelColor
+
+        Polisher.fetchOpenAIModels(baseUrl: baseUrl, apiKey: apiKey) { [weak self] result in
+            guard let self = self else { return }
+            self.refreshModelsButton.isEnabled = true
+            switch result {
+            case .success(let ids):
+                self.fetchedApiModels = ids
+                self.refreshModelsStatus.stringValue = "\(Strings.settingsFetchModelsOK) (\(ids.count))"
+                self.refreshModelsStatus.textColor = NSColor.systemGreen
+                self.rebuildPolishModelOptions(currentModel: self.polishModelPopup.titleOfSelectedItem)
+            case .failure(let err):
+                self.refreshModelsStatus.stringValue = "\(Strings.settingsFetchModelsFail): \(err.localizedDescription)"
+                self.refreshModelsStatus.textColor = NSColor.systemRed
+            }
+        }
     }
 
     // MARK: - Helpers
@@ -800,10 +917,18 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, N
         if selectedCodes.isEmpty { selectedCodes = Config.defaultLanguageHints }
 
         // Polish
-        let backend = backendPopup.titleOfSelectedItem ?? Config.defaultPolishBackend
-        let polishModel = polishModelPopup.titleOfSelectedItem
-            ?? (backend == "codex" ? Config.defaultPolishModelCodex : Config.defaultPolishModelClaude)
+        let backend = currentPolishBackendKey()
+        let polishModel: String = {
+            if let m = polishModelPopup.titleOfSelectedItem, !m.isEmpty { return m }
+            switch backend {
+            case "codex":      return Config.defaultPolishModelCodex
+            case "openai_api": return Config.defaultPolishApiModel
+            default:           return Config.defaultPolishModelClaude
+            }
+        }()
         let polishPrompt = polishPromptTextView.string.trimmingCharacters(in: .whitespacesAndNewlines)
+        let polishApiBaseUrl = polishApiBaseUrlField.stringValue.trimmingCharacters(in: .whitespaces)
+        let polishApiKey = polishApiKeyField.stringValue.trimmingCharacters(in: .whitespaces)
 
         let cfg = Config(
             sttProvider: provider,
@@ -820,7 +945,9 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, N
             polishBackend: backend,
             polishModel: polishModel,
             polishPrompt: polishPrompt,
-            speakerLock: speakerLockCheckbox.state == .on
+            speakerLock: speakerLockCheckbox.state == .on,
+            polishApiBaseUrl: polishApiBaseUrl.isEmpty ? Config.defaultPolishApiBaseUrl : polishApiBaseUrl,
+            polishApiKey: polishApiKey
         )
         do {
             try cfg.save()

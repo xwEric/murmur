@@ -23,10 +23,14 @@ struct Config {
 
     // Shared
     var languageHints: [String]
-    var polishBackend: String      // "claude" | "codex"
+    var polishBackend: String      // "claude" | "codex" | "openai_api"
     var polishModel: String
     var polishPrompt: String
     var speakerLock: Bool          // only meaningful for Soniox
+
+    // Polish via OpenAI-compatible HTTP API (only when polishBackend == "openai_api")
+    var polishApiBaseUrl: String   // e.g. "https://api.openai.com/v1"
+    var polishApiKey: String
 
     static let configURL: URL = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent(".claude-profile/dictate/config.json")
@@ -41,6 +45,8 @@ struct Config {
     static let defaultPolishBackend = "claude"
     static let defaultPolishModelClaude = "sonnet"
     static let defaultPolishModelCodex = "gpt-5-codex"
+    static let defaultPolishApiBaseUrl = "https://api.openai.com/v1"
+    static let defaultPolishApiModel = "gpt-4o-mini"
 
     static func load() throws -> Config {
         // If the config file doesn't exist yet, return an empty default config.
@@ -66,7 +72,9 @@ struct Config {
                 polishBackend: defaultPolishBackend,
                 polishModel: defaultPolishModelClaude,
                 polishPrompt: "",
-                speakerLock: false
+                speakerLock: false,
+                polishApiBaseUrl: defaultPolishApiBaseUrl,
+                polishApiKey: ""
             )
         }
         let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
@@ -94,7 +102,9 @@ struct Config {
             polishBackend: (json["polish_backend"] as? String) ?? defaultPolishBackend,
             polishModel: (json["polish_model"] as? String) ?? defaultPolishModelClaude,
             polishPrompt: (json["polish_prompt"] as? String) ?? "",
-            speakerLock: (json["speaker_lock"] as? Bool) ?? false
+            speakerLock: (json["speaker_lock"] as? Bool) ?? false,
+            polishApiBaseUrl: (json["polish_api_base_url"] as? String) ?? defaultPolishApiBaseUrl,
+            polishApiKey: (json["polish_api_key"] as? String) ?? ""
         )
         return cfg
     }
@@ -118,6 +128,8 @@ struct Config {
             "polish_model": polishModel,
             "polish_prompt": polishPrompt,
             "speaker_lock": speakerLock,
+            "polish_api_base_url": polishApiBaseUrl,
+            "polish_api_key": polishApiKey,
         ]
         let data = try JSONSerialization.data(withJSONObject: dict,
                                               options: [.prettyPrinted, .sortedKeys])

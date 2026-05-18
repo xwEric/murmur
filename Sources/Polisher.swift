@@ -13,6 +13,8 @@ enum Polisher {
                        backend: String,
                        model: String,
                        systemPrompt: String? = nil,
+                       apiBaseUrl: String = "",
+                       apiKey: String = "",
                        completion: @escaping (Result<String, Error>) -> Void) {
         let prompt: String = {
             if let p = systemPrompt?.trimmingCharacters(in: .whitespacesAndNewlines), !p.isEmpty {
@@ -25,11 +27,127 @@ enum Polisher {
             switch backend {
             case "codex":
                 result = runCodex(text: text, model: model, systemPrompt: prompt)
+            case "openai_api":
+                result = runOpenAIAPI(text: text, model: model, systemPrompt: prompt,
+                                       baseUrl: apiBaseUrl, apiKey: apiKey)
             default:
                 result = runClaude(text: text, model: model, systemPrompt: prompt)
             }
             DispatchQueue.main.async { completion(result) }
         }
+    }
+
+    // MARK: - OpenAI-compatible HTTP backend
+
+    /// Fetches the list of model IDs from {baseUrl}/models. Calls back on main queue.
+    /// Works for OpenAI proper, Azure OpenAI, vLLM, LM Studio, any compatible endpoint.
+    static func fetchOpenAIModels(baseUrl: String, apiKey: String,
+                                   completion: @escaping (Result<[String], Error>) -> Void) {
+        let url = URL(string: "\(trimSlash(baseUrl))/models")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "GET"
+        if !apiKey.isEmpty {
+            req.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        }
+        req.timeoutInterval = 15
+
+        URLSession.shared.dataTask(with: req) { data, resp, err in
+            DispatchQueue.main.async {
+                if let err = err { completion(.failure(err)); return }
+                guard let data = data else {
+                    completion(.failure(NSError(domain: "Polisher", code: -10,
+                                                userInfo: [NSLocalizedDescriptionKey: "empty response"])))
+                    return
+                }
+                let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+                if let httpResp = resp as? HTTPURLResponse, httpResp.statusCode >= 400 {
+                    let errMsg = ((json?["error"] as? [String: Any])?["message"] as? String)
+                                 ?? "HTTP \(httpResp.statusCode)"
+                    completion(.failure(NSError(domain: "Polisher", code: httpResp.statusCode,
+                                                userInfo: [NSLocalizedDescriptionKey: errMsg])))
+                    return
+                }
+                guard let arr = json?["data"] as? [[String: Any]] else {
+                    completion(.failure(NSError(domain: "Polisher", code: -11,
+                                                userInfo: [NSLocalizedDescriptionKey: "unexpected response shape"])))
+                    return
+                }
+                let ids = arr.compactMap { $0["id"] as? String }.sorted()
+                completion(.success(ids))
+            }
+        }.resume()
+    }
+
+    private static func runOpenAIAPI(text: String, model: String, systemPrompt: String,
+                                      baseUrl: String, apiKey: String) -> Result<String, Error> {
+        guard !apiKey.isEmpty else {
+            return .failure(NSError(domain: "Polisher", code: -20,
+                                    userInfo: [NSLocalizedDescriptionKey: "API key is empty"]))
+        }
+        guard let url = URL(string: "\(trimSlash(baseUrl))/chat/completions") else {
+            return .failure(NSError(domain: "Polisher", code: -21,
+                                    userInfo: [NSLocalizedDescriptionKey: "invalid base URL"]))
+        }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.timeoutInterval = 30
+
+        let body: [String: Any] = [
+            "model": model,
+            "messages": [
+                ["role": "system", "content": systemPrompt],
+                ["role": "user", "content": text],
+            ],
+            "temperature": 0.3,
+            "max_tokens": 1024,
+        ]
+        req.httpBody = try? JSONSerialization.data(withJSONObject: body)
+
+        NSLog("Murmur: polish via openai_api at \(baseUrl) model=\(model) text=\(text.count) chars")
+        let sem = DispatchSemaphore(value: 0)
+        var outcome: Result<String, Error> = .failure(NSError(domain: "Polisher", code: -99,
+                                                              userInfo: [NSLocalizedDescriptionKey: "no result"]))
+        let start = Date()
+        URLSession.shared.dataTask(with: req) { data, resp, err in
+            defer { sem.signal() }
+            if let err = err { outcome = .failure(err); return }
+            guard let data = data else {
+                outcome = .failure(NSError(domain: "Polisher", code: -22,
+                                           userInfo: [NSLocalizedDescriptionKey: "empty response"]))
+                return
+            }
+            let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+            if let httpResp = resp as? HTTPURLResponse, httpResp.statusCode >= 400 {
+                let errMsg = ((json?["error"] as? [String: Any])?["message"] as? String)
+                             ?? String(data: data.prefix(300), encoding: .utf8)
+                             ?? "HTTP \(httpResp.statusCode)"
+                outcome = .failure(NSError(domain: "Polisher", code: httpResp.statusCode,
+                                           userInfo: [NSLocalizedDescriptionKey: errMsg]))
+                return
+            }
+            if let choices = json?["choices"] as? [[String: Any]],
+               let first = choices.first,
+               let msg = first["message"] as? [String: Any],
+               let content = msg["content"] as? String {
+                let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+                outcome = .success(collapseNewlines(trimmed))
+            } else {
+                outcome = .failure(NSError(domain: "Polisher", code: -23,
+                                           userInfo: [NSLocalizedDescriptionKey: "no choices in response"]))
+            }
+        }.resume()
+        sem.wait()
+        let elapsed = Int(Date().timeIntervalSince(start) * 1000)
+        NSLog("Murmur: openai_api polish elapsed=\(elapsed)ms")
+        return outcome
+    }
+
+    private static func trimSlash(_ s: String) -> String {
+        var r = s
+        while r.hasSuffix("/") { r.removeLast() }
+        return r
     }
 
     // MARK: - Binary lookup

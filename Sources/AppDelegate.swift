@@ -331,7 +331,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Polisher.polish(raw,
                         backend: config.polishBackend,
                         model: config.polishModel,
-                        systemPrompt: config.polishPrompt) { [weak self] result in
+                        systemPrompt: config.polishPrompt,
+                        apiBaseUrl: config.polishApiBaseUrl,
+                        apiKey: config.polishApiKey) { [weak self] result in
             guard let self = self else { return }
             switch result {
             case .success(let polished):

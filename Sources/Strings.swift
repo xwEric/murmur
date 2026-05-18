@@ -120,6 +120,22 @@ enum Strings {
     static var settingsPolishBackend: String { L("润色工具", "Polish backend") }
     static var settingsPolishModel: String { L("润色模型", "Polish model") }
     static var settingsPolishPrompt: String { L("润色提示词（留空使用默认）", "Polish Prompt (leave empty for default)") }
+    static var settingsPolishApiBaseUrl: String { L("Base URL", "Base URL") }
+    static var settingsPolishApiBaseUrlHelp: String { L(
+        "OpenAI 兼容端点。OpenAI 用 https://api.openai.com/v1；本地 vLLM/LM Studio 用对应地址。",
+        "OpenAI-compatible endpoint. Use https://api.openai.com/v1 for OpenAI; vLLM/LM Studio etc. use their own URL."
+    ) }
+    static var settingsPolishApiKey: String { L("API Key", "API Key") }
+    static var settingsPolishApiKeyHelp: String { L(
+        "Bearer token。本地模型如果不要求鉴权可以留空。",
+        "Bearer token. May be left empty for local endpoints that don't require auth."
+    ) }
+    static var settingsRefreshModels: String { L("拉取可用模型", "Refresh available models") }
+    static var settingsFetchingModels: String { L("正在拉取…", "Fetching…") }
+    static var settingsFetchModelsOK: String { L("拉取成功", "Models loaded") }
+    static var settingsFetchModelsFail: String { L("拉取失败", "Could not load models") }
+    static var settingsPolishBackendCli: String { L("CLI", "CLI") }
+    static var settingsPolishBackendApi: String { L("OpenAI 兼容 API", "OpenAI-compatible API") }
     static var settingsPolishPromptHelp: String { L("自定义 system prompt；留空时使用 Polisher 默认提示词。", "Custom system prompt; empty = built-in default.") }
     static var settingsSpeakerLock: String { L("锁定主说话人（仅 Soniox，实验）", "Lock to primary speaker (Soniox only, experimental)") }
     static var settingsSpeakerLockHelp: String { L("基于 Soniox 在线说话人聚类。准确度有限，若身边总有干扰可试。", "Based on Soniox online speaker clustering. Limited accuracy — try if background voices interfere.") }
