@@ -4,7 +4,7 @@
 
 **Murmur is a minimalist macOS voice-dictation app.** Press **Right ⌘** to speak, press it again, and your transcription is pasted at the cursor — optionally polished by your local Claude or Codex CLI first. A bottom-center overlay shows the live transcript with adaptive sizing.
 
-https://github.com/user-attachments/assets/e4b9483f-68cf-45d5-9f37-596fe46d9327
+https://github.com/user-attachments/assets/dc1de0a4-6d30-435e-afd0-97f6e198f065
 
 ---
 
@@ -76,10 +76,13 @@ Click any text field anywhere on your system (Notes, Slack, browser, terminal �
 ## ✨ Why Murmur
 
 1. **No subscription.** Others charge $10–20/month flat. Murmur is pay-as-you-go with your own API key.
-2. **Open source, zero data retention.** MIT-licensed; nothing about you is stored or proxied through anyone else's servers.
-3. **AI polish — your choice of route.** Use your locally-installed `claude` / `codex` CLI (free, reuses your existing subscription, ~5s latency) **or** plug in any OpenAI-compatible API endpoint (1–2s latency, pay per call).
-4. **Pause as many times as you want.** Press Space to pause mid-recording, press again to resume. Works repeatedly, auto-reconnects on socket timeout.
-5. **Real-time transcription.** Words show up in the overlay as you speak.
+- **Real-time transcription**, same Soniox engine — words appear in the overlay as you speak.
+- **Pause and resume any time** — press Space, take a sip of coffee, press Space again. Repeat as many times as you want. Most paid apps can't do this.
+- **Smarter, effectively-free AI polish** — reuse your already-paid `claude` or `codex` CLI subscription, or plug in any OpenAI-compatible endpoint.
+- **Multi-provider, not Soniox-only** — Deepgram Nova-3, OpenAI Realtime, or any OpenAI-compatible endpoint all work.
+- **18 languages, speaker lock, zero data retention.** Audio goes straight from your Mac to the STT provider — Murmur has no server.
+- **Open source (MIT).** Fork it, audit it, customize the hotkey, change the polish prompt.
+
 
 ---
 
@@ -111,7 +114,7 @@ You only need ONE provider's key to use Murmur. Switch between them anytime in S
 ### Soniox (default, best multilingual)
 
 1. Go to [console.soniox.com](https://console.soniox.com) and sign up (Google login works)
-2. Free trial includes some credit; after that ~$0.04 / min of audio
+2. Pricing: **~$0.002 / min ($0.12 / hour)** for real-time streaming, billed by tokens
 3. **Settings → API Keys → Create new key** → copy
 4. In Murmur Settings → STT Provider → Soniox → paste
 

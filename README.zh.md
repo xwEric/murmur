@@ -76,10 +76,12 @@ open build/Murmur.app
 ## ✨ 为什么选 Murmur
 
 1. **没有月费。** 别人动辄每月 $10–20，Murmur 完全按需付费 —— 你用自己的 API key，按用量计费。
-2. **开源 + 零数据存储。** MIT 协议，不存储任何用户信息，也不经过任何中间服务器，绝对安全。
-3. **润色路径任选**。本机已登录的 `claude` / `codex` CLI（免费复用你的订阅，~5 秒）**或**任何 OpenAI 兼容 HTTP API（1-2 秒，按调用计费）。
-4. **支持暂停录音。** 录音中按空格暂停，再按空格继续；可以暂停多次，socket 超时也会自动 reconnect。
-5. **实时语音识别。** 说话的同时，悬浮窗里实时显示识别结果。
+- **实时识别**，同样用 Soniox 引擎 —— 说话同时悬浮窗实时显示。
+- **随时暂停、随时续录** —— 按一下空格喝口水，再按一下继续。要暂停几次都行。多数付费 app 不支持。
+- **更智能、几乎免费的 AI 润色** —— 复用你已经付费的 `claude` 或 `codex` CLI，或者任何 OpenAI 兼容接口。
+- **不止 Soniox** —— Deepgram Nova-3、OpenAI Realtime、任何 OpenAI 兼容端点都能接。
+- **18 种语言、声纹锁定、零数据留存。** 音频从你的 Mac 直接送到 STT 提供商 —— Murmur 没有任何服务器。
+- **开源（MIT 协议）。** 可以 fork、可以审计、可以自己改快捷键和润色 prompt。
 
 ---
 
@@ -111,7 +113,7 @@ open build/Murmur.app
 ### Soniox（默认，多语言最好）
 
 1. 去 [console.soniox.com](https://console.soniox.com) 注册（Google 登录可用）
-2. 注册有免费额度，之后 ~$0.04 / 分钟音频
+2. 价格：实时识别 **~$0.002 / 分钟（$0.12 / 小时）**，按 token 计费
 3. **Settings → API Keys → Create new key** → 复制
 4. Murmur 设置 → 识别引擎 → Soniox → 粘贴
 
