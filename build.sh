@@ -44,9 +44,15 @@ if [ -f "Resources/icon_1024.png" ]; then
     rm -rf "$ICONSET"
 fi
 
-echo "→ swiftc compiling..."
+# Deployment target — must match LSMinimumSystemVersion in Info.plist.
+# Without this, swiftc defaults to the host macOS version, producing a binary
+# whose LC_BUILD_VERSION minos blocks launch on older macOS releases.
+DEPLOYMENT_TARGET="${MURMUR_DEPLOYMENT_TARGET:-13.0}"
+
+echo "→ swiftc compiling (target: arm64-apple-macos${DEPLOYMENT_TARGET})..."
 swiftc \
     -O \
+    -target "arm64-apple-macos${DEPLOYMENT_TARGET}" \
     -framework AppKit \
     -framework AVFoundation \
     -framework CoreGraphics \
