@@ -35,6 +35,9 @@ struct Config {
     // UI language for Murmur's own menus/settings: "en" | "zh". Default English.
     var uiLanguage: String
 
+    // Play start/end recording sounds. Default true (preserves old behavior).
+    var playSounds: Bool
+
     static let configURL: URL = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent(".claude-profile/dictate/config.json")
 
@@ -79,7 +82,8 @@ struct Config {
                 speakerLock: false,
                 polishApiBaseUrl: defaultPolishApiBaseUrl,
                 polishApiKey: "",
-                uiLanguage: defaultUILanguage
+                uiLanguage: defaultUILanguage,
+                playSounds: true
             )
         }
         let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
@@ -110,7 +114,8 @@ struct Config {
             speakerLock: (json["speaker_lock"] as? Bool) ?? false,
             polishApiBaseUrl: (json["polish_api_base_url"] as? String) ?? defaultPolishApiBaseUrl,
             polishApiKey: (json["polish_api_key"] as? String) ?? "",
-            uiLanguage: (json["ui_language"] as? String) ?? defaultUILanguage
+            uiLanguage: (json["ui_language"] as? String) ?? defaultUILanguage,
+            playSounds: (json["play_sounds"] as? Bool) ?? true
         )
         return cfg
     }
@@ -137,6 +142,7 @@ struct Config {
             "polish_api_base_url": polishApiBaseUrl,
             "polish_api_key": polishApiKey,
             "ui_language": uiLanguage,
+            "play_sounds": playSounds,
         ]
         let data = try JSONSerialization.data(withJSONObject: dict,
                                               options: [.prettyPrinted, .sortedKeys])

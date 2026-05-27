@@ -17,6 +17,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSLog("Murmur: applicationDidFinishLaunching")
 
+        // Install a minimal application main menu so Cmd+X/C/V/A and Cmd+Z/Z+Shift
+        // work in Settings text fields. Without this, .accessory apps have no
+        // Edit menu in the responder chain and the keystrokes are no-ops.
+        installMainMenu()
+
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
         // Read UI language from config BEFORE building the menu (so labels render correctly).
@@ -162,7 +167,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         targetApp = NSWorkspace.shared.frontmostApplication
         NSLog("Murmur: target app at record-start = \(targetApp?.localizedName ?? "?") pid=\(targetApp?.processIdentifier ?? -1)")
 
-        SoundPlayer.start()
+        if config.playSounds { SoundPlayer.start() }
         state.set(.recording)
         liveWindow.show()
         liveWindow.setMode(.recording)
@@ -314,7 +319,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func stopRecording(autoInsert: Bool, autoPolish: Bool) {
         NSLog("Murmur: stopRecording autoInsert=\(autoInsert) autoPolish=\(autoPolish)")
-        SoundPlayer.stop()
+        if config?.playSounds ?? true { SoundPlayer.stop() }
         recorder.stop()
         state.autoInsertAfterFinalize = autoInsert
         state.autoPolishAfterFinalize = autoPolish
@@ -484,16 +489,78 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func openSettings() {
         if settingsWindow == nil {
-            settingsWindow = SettingsWindow { [weak self] newCfg in
-                guard let self = self else { return }
-                let langChanged = (Strings.isZH != (newCfg.uiLanguage == "zh"))
-                self.config = newCfg
-                Strings.applyConfigLanguage(newCfg.uiLanguage)
-                if langChanged { self.buildMenu() }
-                NSLog("Murmur: config reloaded after settings save (langChanged=\(langChanged))")
-            }
+            settingsWindow = SettingsWindow(
+                onSaved: { [weak self] newCfg in
+                    guard let self = self else { return }
+                    let langChanged = (Strings.isZH != (newCfg.uiLanguage == "zh"))
+                    self.config = newCfg
+                    Strings.applyConfigLanguage(newCfg.uiLanguage)
+                    if langChanged { self.buildMenu() }
+                    NSLog("Murmur: config reloaded after settings save (langChanged=\(langChanged))")
+                },
+                onClose: { [weak self] in
+                    self?.settingsWindowDidClose()
+                }
+            )
         }
+        // Promote to a regular app while Settings is open. As .accessory the window
+        // is unreliably focusable and can disappear when the user switches apps.
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
         settingsWindow?.show()
+    }
+
+    private func settingsWindowDidClose() {
+        // Drop back to menu-bar-only mode so we don't keep a Dock icon around.
+        NSApp.setActivationPolicy(.accessory)
+    }
+
+    /// Builds a minimal main menu so standard Cmd+X/C/V/A and Cmd+Z work in
+    /// any text field inside the Settings window. Without this, .accessory
+    /// apps have no Edit menu in the responder chain, so AppKit drops those
+    /// keystrokes silently.
+    private func installMainMenu() {
+        let mainMenu = NSMenu()
+
+        // App menu (first item, title typically replaced by the system with the
+        // app name in bold, regardless of what we set here).
+        let appMenuItem = NSMenuItem()
+        mainMenu.addItem(appMenuItem)
+        let appMenu = NSMenu()
+        appMenu.addItem(NSMenuItem(title: "Quit Murmur",
+                                   action: #selector(NSApplication.terminate(_:)),
+                                   keyEquivalent: "q"))
+        appMenuItem.submenu = appMenu
+
+        // Edit menu — the critical one. Selectors are forwarded down the
+        // responder chain so they hit NSTextField / NSTextView automatically.
+        let editMenuItem = NSMenuItem()
+        mainMenu.addItem(editMenuItem)
+        let editMenu = NSMenu(title: "Edit")
+        editMenu.addItem(NSMenuItem(title: "Undo",
+                                    action: Selector(("undo:")),
+                                    keyEquivalent: "z"))
+        let redoItem = NSMenuItem(title: "Redo",
+                                  action: Selector(("redo:")),
+                                  keyEquivalent: "z")
+        redoItem.keyEquivalentModifierMask = [.command, .shift]
+        editMenu.addItem(redoItem)
+        editMenu.addItem(NSMenuItem.separator())
+        editMenu.addItem(NSMenuItem(title: "Cut",
+                                    action: #selector(NSText.cut(_:)),
+                                    keyEquivalent: "x"))
+        editMenu.addItem(NSMenuItem(title: "Copy",
+                                    action: #selector(NSText.copy(_:)),
+                                    keyEquivalent: "c"))
+        editMenu.addItem(NSMenuItem(title: "Paste",
+                                    action: #selector(NSText.paste(_:)),
+                                    keyEquivalent: "v"))
+        editMenu.addItem(NSMenuItem(title: "Select All",
+                                    action: #selector(NSText.selectAll(_:)),
+                                    keyEquivalent: "a"))
+        editMenuItem.submenu = editMenu
+
+        NSApp.mainMenu = mainMenu
     }
 
     @objc private func openAccessibility() {

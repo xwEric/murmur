@@ -54,6 +54,7 @@ private enum SettingsSection: Int, CaseIterable {
 final class SettingsWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewDelegate {
     private var window: NSWindow!
     private let onSaved: (Config) -> Void
+    private let onClose: (() -> Void)?
 
     // sidebar
     private var sidebarTable: NSTableView!
@@ -65,6 +66,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, N
     private var uiLanguagePopup: NSPopUpButton!
     private var langCheckboxes: [String: NSButton] = [:]
     private var speakerLockCheckbox: NSButton!
+    private var playSoundsCheckbox: NSButton!
 
     // Provider section
     private var providerPopup: NSPopUpButton!
@@ -92,9 +94,16 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, N
     private var apiPanelStack: NSStackView!
     private var fetchedApiModels: [String] = []
 
-    init(onSaved: @escaping (Config) -> Void) {
+    init(onSaved: @escaping (Config) -> Void, onClose: (() -> Void)? = nil) {
         self.onSaved = onSaved
+        self.onClose = onClose
         super.init()
+    }
+
+    // MARK: - NSWindowDelegate
+
+    func windowWillClose(_ notification: Notification) {
+        onClose?()
     }
 
     // MARK: - Public entry point
@@ -119,7 +128,8 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, N
             speakerLock: false,
             polishApiBaseUrl: Config.defaultPolishApiBaseUrl,
             polishApiKey: "",
-            uiLanguage: Config.defaultUILanguage
+            uiLanguage: Config.defaultUILanguage,
+            playSounds: true
         )
         populate(from: current)
 
@@ -138,6 +148,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, N
         let selected = Set(c.languageHints)
         for (code, box) in langCheckboxes { box.state = selected.contains(code) ? .on : .off }
         speakerLockCheckbox.state = c.speakerLock ? .on : .off
+        playSoundsCheckbox.state = c.playSounds ? .on : .off
 
         // Provider selection
         providerPopup.selectItem(withTitle: providerDisplay(c.sttProvider))
@@ -304,6 +315,15 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, N
         let speakerHelp = makeHintLabel(Strings.settingsSpeakerLockHelp)
         stack.addArrangedSubview(speakerLockCheckbox)
         stack.addArrangedSubview(speakerHelp)
+
+        stack.addArrangedSubview(makeDivider())
+
+        // Play start/end recording sounds
+        playSoundsCheckbox = NSButton(checkboxWithTitle: Strings.settingsPlaySounds,
+                                      target: nil, action: nil)
+        let soundsHelp = makeHintLabel(Strings.settingsPlaySoundsHelp)
+        stack.addArrangedSubview(playSoundsCheckbox)
+        stack.addArrangedSubview(soundsHelp)
 
         return wrapInScroll(stack)
     }
@@ -986,7 +1006,8 @@ final class SettingsWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, N
                 case Strings.settingsUILangEnglish: return "en"
                 default:                            return "auto"
                 }
-            }()
+            }(),
+            playSounds: playSoundsCheckbox.state == .on
         )
         do {
             try cfg.save()

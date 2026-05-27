@@ -158,6 +158,8 @@ enum Strings {
     static var settingsPolishPromptHelp: String { L("自定义 system prompt；留空时使用 Polisher 默认提示词。", "Custom system prompt; empty = built-in default.") }
     static var settingsSpeakerLock: String { L("锁定主说话人（仅 Soniox，实验）", "Lock to primary speaker (Soniox only, experimental)") }
     static var settingsSpeakerLockHelp: String { L("基于 Soniox 在线说话人聚类。准确度有限，若身边总有干扰可试。", "Based on Soniox online speaker clustering. Limited accuracy — try if background voices interfere.") }
+    static var settingsPlaySounds: String { L("播放开始/结束录音提示音", "Play start/end recording sounds") }
+    static var settingsPlaySoundsHelp: String { L("关闭后，按下右 ⌘ 开始或结束录音时不会发出提示音。", "When off, no sound is played when you press Right ⌘ to start or stop recording.") }
     static var settingsSave: String { L("保存", "Save") }
     static var settingsCancel: String { L("取消", "Cancel") }
     static var settingsSaveOK: String { L("已保存", "Saved") }
